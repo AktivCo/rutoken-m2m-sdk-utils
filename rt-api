@@ -1,0 +1,258 @@
+#!/bin/sh
+
+
+#this script used as a library in other rtsdk utils
+
+print_error(){
+
+	echo -e "[\e[31mError:\e[0m \e[1m$1\e[0m]"
+}
+
+print_succeed(){
+
+	echo -e "[\e[32mSuccess:\e[0m \e[1m$1\e[0m]"
+}
+
+print_info(){
+
+	echo -e "[\e[93mInfo:\e[0m \e[1m$1\e[0m]"
+}
+
+exit_if_not_root(){
+	
+	user_id=$(id -u)
+	if [ "$user_id" -ne 0 ]; then
+		print_error "run as root"
+		exit 1
+	fi
+}
+
+is_pcscd_running(){
+
+	if [ -f /var/run/pcscd/pcscd.pid ]; then
+		pcscd_pid=$(cat /var/run/pcscd/pcscd.pid | tr -d '\0')
+		if [ -d "/proc/$pcscd_pid" ]; then
+			true
+        else
+			false
+        fi
+	else
+		false
+	fi
+
+	return
+}
+
+stop_pcscd(){
+
+	exit_if_not_root
+
+	if is_pcscd_running; then
+		kill $pcscd_pid 1>/dev/null 2>/dev/null
+		exit_if_not_root $?
+		sleep 1
+		true
+	else
+		false
+	fi
+
+	return
+}
+
+init_log(){
+	
+	log_config_path="/tmp/rtm_log.config"
+
+	if [ ! -f $log_config_path ]; then
+		touch $log_config_path
+	fi
+
+	pcscd_flags=''
+	ccid_env=''
+	rtuart_env=''
+}
+
+read_log_config(){
+	
+	init_log
+
+	pcscd_flags=$(cat $log_config_path | grep pcscd_flags | cut -d '=' -f2)
+
+	ccid_env=$(cat $log_config_path | grep LIBCCID_ifdLogLevel)
+
+	rtuart_env=$(cat $log_config_path | grep LIBRTUART_ifdLogLevel)
+}
+
+start_pcscd(){
+
+	exit_if_not_root
+	
+	if is_pcscd_running; then
+		false
+	else
+		read_log_config
+		
+		env_variables="$ccid_env $rtuart_env"
+
+		sh -c "$env_variables start-stop-daemon -SbC -x /usr/sbin/pcscd -- $pcscd_flags 1>/dev/null 2>/dev/null"
+		sleep 1
+		is_pcscd_running
+		if [ $? -eq 1 ]; then
+			print_error "pcscd is unable to start"
+			exit 1
+		fi
+		true
+	fi
+
+	return
+}
+
+unplug_usb(){
+
+	exit_if_not_root
+
+	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
+	found=$(cat /tmp/.pcsc_scan.out | grep ATR | wc -l)
+	rm /tmp/.pcsc_scan.out
+	if [ ! $found -eq 2 ]; then
+		stop_pcscd
+		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/libccid.so /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/.libccid.so 2>/dev/null
+		start_pcscd
+	fi
+}
+
+plug_usb(){
+	
+	exit_if_not_root
+
+	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
+	found=$(cat /tmp/.pcsc_scan.out | grep ATR | wc -l)
+	rm /tmp/.pcsc_scan.out
+	if [ ! $found -ne 2 ]; then
+		stop_pcscd
+		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/.libccid.so /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/libccid.so 2>/dev/null
+		start_pcscd
+	fi
+}
+
+unplug_usb_unsafe(){
+
+	exit_if_not_root
+	
+	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
+	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
+	rm /tmp/.pcsc_scan.out
+	if [ ! -z "$found" ]; then
+		sh -c "echo '1-1.2' > /sys/bus/usb/drivers/usb/unbind"
+	fi
+}
+
+plug_usb_unsafe(){
+
+	exit_if_not_root
+	
+	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
+	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
+	rm /tmp/.pcsc_scan.out
+	if [ -z "$found" ]; then
+		sh -c "echo '1-1.2' > /sys/bus/usb/drivers/usb/bind"
+	fi
+}
+
+unplug_uart(){
+
+	if [ -f /etc/reader.conf.d/librtuart ]; then
+		stop_pcscd
+		mv /etc/reader.conf.d/librtuart /etc/reader.conf.d/.librtuart 2>/dev/null
+		start_pcscd
+	fi
+}
+
+plug_uart(){
+
+	if [ ! -f /etc/reader.conf.d/librtuart ]; then
+		stop_pcscd
+		mv /etc/reader.conf.d/.librtuart /etc/reader.conf.d/librtuart 2>/dev/null
+		start_pcscd
+	fi
+}
+
+select_device(){
+
+	case $1 in
+			usb)
+				plug_usb_unsafe
+				unplug_uart
+			;;
+			uart)
+				plug_uart
+				unplug_usb_unsafe
+			;;
+			all)
+				plug_usb_unsafe
+				plug_uart
+			;;
+			*)
+				print_error "no such device"
+				exit 1
+			;;
+	esac
+}
+
+restore_devices(){
+	
+	case $1 in
+		usb)  plug_uart ;;
+		uart) plug_usb_unsafe  ;;
+		all);;
+		*)
+			print_error "no such device"
+			exit 1
+		;;
+	esac
+}
+
+is_interface_uart(){
+
+	if [ ! -d /sys/class/gpio/gpio22 ]; then
+		true
+		return
+	fi
+
+	if grep -q 'in' /sys/class/gpio/gpio22/direction; then
+		true
+		return
+	fi
+
+	gpio22_value=$(cat /sys/class/gpio/gpio22/value)
+	
+	gpio22_active_low=$(cat /sys/class/gpio/gpio22/active_low)
+
+	if [ $gpio22_value -eq $gpio22_active_low ]; then
+		true
+	else
+		false
+	fi
+
+	return
+}
+
+clear_gpio22(){
+
+	exit_if_not_root
+	
+	if [ -d /sys/class/gpio/gpio22 ]; then
+		echo '22' > /sys/class/gpio/unexport
+	fi
+}
+
+set_interface_sc(){
+
+	exit_if_not_root
+
+	echo '22' > /sys/class/gpio/export
+
+	echo 'out' > /sys/class/gpio/gpio22/direction
+
+	echo '1' > /sys/class/gpio/gpio22/value
+}

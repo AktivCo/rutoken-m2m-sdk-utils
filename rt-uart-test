@@ -1,0 +1,81 @@
+#!/bin/sh
+
+. ./rtm_api.sh
+
+usage(){
+	echo "Usage: sudo ./rtuart_test.sh [option]"
+	echo "Options:"
+	echo "        -f, --force   force run sample; configurate system if needed"
+	echo "                         if -f option is not used rtuart_control will not run sample if system misconfigured"
+	echo "        -h, --help    see this message"
+}
+
+check_configuration(){
+
+	if is_pcscd_running; then
+		print_error "pcscd is running; kill pcscd or use -f option"
+		exit 1
+	fi
+
+	if ! is_interface_uart; then
+		print_error "current selected interface is misconfigured; change interface via 'sudo ./rtm_control.sh -c uart' or use -f option"
+		exit 1
+	fi
+
+	true
+	return
+}
+
+run(){
+
+	exit_if_not_root
+	
+	if check_configuration; then
+		/usr/bin/rtuart_transport_test /dev/ttyAMA0
+	fi
+}
+
+force_run(){
+
+	pcscd_was_running=false
+
+	if is_pcscd_running; then
+		stop_pcscd
+		pcscd_was_running=true
+	fi
+
+	clear_gpio22
+	
+	/usr/bin/rtuart_transport_test /dev/ttyAMA0
+
+	if $pcscd_was_running; then
+		start_pcscd
+	fi
+}
+
+main(){
+
+	if [ $# -eq 0 ]
+	then
+		run
+		exit 1
+	fi
+
+	case $1 in
+		-f | --force)
+			force_run
+			exit 0
+		;;
+		-h | --help)
+			usage
+			exit 0
+		;;
+		*)
+			usage
+			exit 1
+		;;
+	esac
+}
+
+
+main $1

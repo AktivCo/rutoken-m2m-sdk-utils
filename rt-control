@@ -1,0 +1,295 @@
+#!/bin/sh
+
+. ./rtm_api.sh
+
+usage(){
+	echo "Usage: sudo ./rtm_control.sh <command> [command options]"
+	echo "Commands:"
+	echo "          -s, --select_device     <device>       configure and select device to use in SDK samples (implicitly starts pcscd)"
+	echo "          Devices:"
+	echo "                      usb             select only Rutoken ECP TSSOP to be used over PCSC"
+	echo "                      uart            select only Rutoken ECP B to be used over PCSC"
+	echo "                      all             select both devices to be used over PCSC"
+	echo -e "                                      \e[31mIMPORTANT!\e[0m \e[1mEnable all devices before reboot or poweroff!\e[0m"
+	echo " "
+	echo "          -c, --change_interface  <interface>    changes interfaces between Rutoken ECP SC and Rutoken ECP B"
+	echo "          Interfaces:"
+	echo "                      uart           change interface to Rutoken ECP B"
+	echo "                      sc             change interface to Rutoken ECP SC"
+	echo " "
+	echo "          -d, --disable_log                     disable pcscd logging (implicitly disables CCID and Rutoken UART drivers logs)"
+	echo "          -l, --log_level                       change logging settings (call without additional flags will set default log level for both drivers)"
+	echo "          Flags:"
+	echo "                      -c  <level>    set log level for CCID driver"
+	echo "                      -u  <level>    set log level for Rutoken UART driver"
+	echo " "
+	echo "          -p, --pcscd  <start|stop|restart>      start, stop or restart pcscd"
+	echo "          -i, --info                             see information about current working interfaces"
+	echo "          -h, --help                             see this message"
+}
+
+check_arg(){
+
+	if [ -z "$1" ]; then
+		print_error "no argument supplied"
+		usage
+		exit 1
+	fi
+}
+
+start_stop_pcscd(){
+
+	check_arg $1
+
+	case $1 in
+		start)
+			if start_pcscd; then
+				print_succeed "pcscd started"
+			else
+				print_info "pcscd already running; Nothing done"
+			fi
+		;;
+		stop)
+			if stop_pcscd; then
+				print_succeed "pcscd stopped"
+			else
+				print_info "pcscd isn't running; Nothing done"
+			fi
+		;;
+		restart)
+			stop_pcscd
+			start_pcscd
+			print_succeed "pcscd restarted"
+		;;
+		*)
+			print_error "invalid option"
+			exit 1
+		;;
+	esac
+}
+
+make_uart_available(){
+	
+	if ! is_interface_uart; then
+		print_info "selected interface is Rutoken ECP SC; changing interface to Rutoken ECP B"
+		change_interface uart
+	fi
+}
+
+set_device(){
+
+	check_arg $1
+	
+	select_device $1
+
+	case $1 in
+		usb)
+			print_succeed "Rutoken ECP TSSOP device selected"
+		;;
+		uart)
+			make_uart_available
+			print_succeed "Rutoken ECP B device selected"
+		;;
+		all)
+			make_uart_available
+			print_succeed "all Rutoken devices are selected"
+		;;
+	esac
+}
+
+change_interface(){
+
+	check_arg $1
+	pcscd_was_running=false
+
+	if is_pcscd_running; then
+		stop_pcscd
+		pcscd_was_running=true
+	fi
+
+	clear_gpio22
+
+	case $1 in
+		uart)
+			print_succeed "interface changed to Rutoken ECP B"
+		;;
+		sc)
+			set_interface_sc
+			print_succeed "interface changed to Rutoken ECP SC"
+		;;
+		*)
+			print_error "invalid option"
+			exit 1
+
+		;;
+	esac
+
+	if $pcscd_was_running; then
+		start_pcscd
+	fi
+}
+
+
+info(){
+
+	if lsusb | grep -q "0a89:0030"; then
+		rutoken_tssop="\e[32m connected     \e[0m"
+	else
+		rutoken_tssop="\e[31m not connected \e[0m"
+	fi
+
+	if is_interface_uart; then
+		rutoken_ecpb="\e[32m connected     \e[0m"
+		rutoken_sc="\e[31m not connected \e[0m"
+	else
+		rutoken_ecpb="\e[31m not connected \e[0m "
+		rutoken_sc="\e[32m connected     \e[0m "
+	fi
+
+	if is_pcscd_running; then
+		pcscd="\e[32m running     \e[0m"
+	else
+		pcscd="\e[31m not running \e[0m"
+	fi
+
+	timeout 1 pcsc_scan 1> /tmp/.pcsc_scan_info 2>/dev/null
+	if grep -q "Aktiv Rutoken ECP" /tmp/.pcsc_scan_info; then
+		rutoken_tssop_pcsc="\e[32m available     \e[0m"
+	else
+		rutoken_tssop_pcsc="\e[31m not available \e[0m"
+	fi
+
+	if grep -q "Rutoken ECP B" /tmp/.pcsc_scan_info; then
+		rutoken_ecpb_pcsc="\e[32m available     \e[0m"
+	else
+		rutoken_ecpb_pcsc="\e[31m not available \e[0m"
+	fi
+
+	rm /tmp/.pcsc_scan_info
+
+	rutoken_sc_pcsc="\e[31m not available \e[0m"
+
+	echo -e "Rutoken ECP TSSOP (usb)      $rutoken_tssop to RPi2"
+	echo -e "Rutoken ECP B     (uart)     $rutoken_ecpb to RPi2"
+	echo -e "Rutoken ECP SC    (microsim) $rutoken_sc to RPi2"
+	echo -e "pcscd                        is $pcscd"
+	echo -e "Rutoken ECP TSSOP (usb)      is $rutoken_tssop_pcsc over PCSC"
+	echo -e "Rutoken ECP B     (uart)     is $rutoken_ecpb_pcsc over PCSC"
+	echo -e "Rutoken ECP SC    (microsim) is $rutoken_sc_pcsc over PCSC"
+}
+
+check_numeric(){
+	
+	if ! echo $OPTARG | grep -Eq "^(0[xX][0-9a-fA-F]+|[0-9]+)$"; then
+		print_error "Argument $OPTARG must be decimal or hexadecimal number for option -$opt!"
+		exit 1
+	fi
+}
+
+set_log_levels(){
+
+	exit_if_not_root
+
+	while getopts ":c:u:" opt; do
+		case $opt in
+			c)	
+				check_numeric
+				ccid_lvl=$OPTARG
+			;;
+			u)	
+				check_numeric
+				rtuart_lvl=$OPTARG
+			;;
+			:)
+				print_error "Option -$OPTARG requires an argument!"
+				exit 1
+			;;
+			\?)
+				print_error "Invalid option: -$OPTARG!"
+				exit 1
+			;;
+			*)	
+				print_succeed "Run pcscd with previous log settings"
+			;;
+		esac
+	done
+
+	read_log_config
+
+	pcscd_flags="pcscd_flags=-ad"
+
+	if [ -z "$ccid_lvl" ]; then
+		ccid_lvl=3
+	fi
+	
+	if [ -z "$rtuart_lvl" ]; then
+		rtuart_lvl=3
+	fi
+
+	ccid_env="LIBCCID_ifdLogLevel=$ccid_lvl"
+	rtuart_env="LIBRTUART_ifdLogLevel=$rtuart_lvl"
+
+	echo $pcscd_flags > $log_config_path
+	echo $ccid_env >> $log_config_path
+	echo $rtuart_env >> $log_config_path
+
+	stop_pcscd
+	start_pcscd
+	ccid_lvl=$(echo $ccid_env | cut -d "=" -f2)
+	rtuart_lvl=$(echo $rtuart_env | cut -d "=" -f2)
+	print_succeed "ccid log level: $ccid_lvl; rtuart log level: $rtuart_lvl"
+}
+
+disable_log(){
+	
+	exit_if_not_root
+	init_log
+	echo " " > $log_config_path
+	print_succeed "log disabled"
+}
+
+main(){
+
+	if [ $# -eq 0 ]; then
+		usage
+		exit 1
+	fi
+
+	case $1 in
+		-s | --select_device)
+			set_device $2
+			exit 0
+		;;
+		-c | --change_interface)
+			change_interface $2
+			exit 0
+		;;
+		-p | --pcscd)
+			start_stop_pcscd $2
+			exit 0
+		;;
+		-l | --log_level)
+			shift
+			set_log_levels $*
+			exit 0
+		;;
+		-d | --disable_log)
+			disable_log
+			exit 0
+		;;
+		-i | --info)
+			info
+			exit 0
+		;;
+		-h | --help)
+			usage
+			exit 0
+		;;
+		*)
+			usage
+			exit 1
+		;;
+	esac
+}
+
+main $*

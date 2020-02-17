@@ -1,0 +1,147 @@
+#!/bin/sh
+
+. ./rtm_api.sh
+
+usage(){
+	echo "Usage: sudo ./rtm_run_sample.sh [ options ] -p <path> "
+	echo "Options:"
+	echo "          -h                               see help message"
+	echo "          -s                               enable pcsc-spy logging of the sample"	
+	echo "          -l                               write sample output to log file"
+	echo -e "                                      \e[1mall logs created in /home/user/log directory\e[0m"
+	echo "          -d  <device>                     select device to run sample on"
+	echo "          Devices:"
+	echo "                      usb                  run sample on Rutoken ECP TSSOP only"
+	echo "                      uart                 run sample on Rutoken ECP B only"
+	echo "                      all                  run sample on both devices; this is default settings if -d option not provided"
+	echo " "
+	echo "          -p  <path>                       path to sample to run"
+}
+
+check_device(){
+	
+	if ! echo $OPTARG | grep -Eq '^(uart|usb|all)'; then
+		print_error "Device $OPTARG doesn't exist"
+		exit 1
+	fi
+}
+
+check_sample(){
+
+	if [ ! -f $OPTARG ]; then
+		print_error "Sample $OPTARG doesn't exist"
+		exit 1
+	fi
+}
+
+run_sample(){
+
+	spy=$1
+	log=$2
+	device=$3
+	sample=$(realpath $4 / | head -n 1)
+	sample_name=$( echo "$sample" | awk -F "/" '{print $NF}')
+
+	#change it if you have another user
+	user="m2mib"
+	home=$(sudo -u $user sh -c "cd ~$user && pwd")
+
+	pcsc_spy_fifo="$home/pcsc-spy"
+
+
+	if [ -p $pcsc_spy_fifo ]; then
+		rm $pcsc_spy_fifo
+	fi
+
+	select_device $device
+
+	if $spy || $log; then
+		log_dir="$home/log/$sample_name"
+		sudo -u $user -H sh -c "mkdir -p $log_dir"
+	fi
+
+	preload=""
+	if $spy; then
+		preload="LD_PRELOAD=/usr/lib/libpcscspy.so"
+		sudo -u $user -H sh -c "mkfifo $pcsc_spy_fifo"
+		pcsc_spy_raw_out="$log_dir/.pcsc-spy.raw"
+		sudo -u $user -H sh -c "cat $pcsc_spy_fifo > $pcsc_spy_raw_out &"
+		cat_pid=$!
+		pcsc_spy_out="$log_dir/$sample_name-pcsc-spy.log"
+	fi 
+
+	if $log; then
+		print_info "$sample_name work in progress, please wait"
+		sample_out="$log_dir/$sample_name.log"
+		sudo -u $user -H sh -c "$preload $sample > $sample_out"
+		print_succeed "$sample_name done!"
+	else
+		sudo -u $user -H sh -c "$preload $sample"
+		print_succeed "$sample_name done!"
+	fi
+
+	if $spy; then
+		print_info "pcsc-spy work in progress, please wait"
+		sudo -u $user -H sh -c "/usr/bin/pcsc-spy -n $pcsc_spy_raw_out > $pcsc_spy_out"
+		print_succeed "pcsc-spy done!"
+		if ps -C -p $cat_pid 1>/dev/null; then
+			kill $cat_pid
+		fi
+		
+		rm $pcsc_spy_fifo $pcsc_spy_raw_out
+
+	fi
+
+	restore_devices $device
+}
+
+main(){
+
+	if [ $# -lt 1 ]; then
+		usage
+		exit 1
+	fi
+
+	spy_option=false
+	log_option=false
+	device='all'
+	path=''
+
+	while getopts "hsld:p:" opt; do
+		case $opt in
+			h)	usage
+				exit 0
+			;;
+			s)	spy_option=true
+			;;
+			l)	log_option=true
+			;;
+			d)	check_device
+				device=$OPTARG
+			;;
+			p)	check_sample
+				path=$OPTARG
+			;;
+			*)	usage
+				exit 1
+			;;
+		esac
+	done
+
+	exit_if_not_root
+
+	if ! is_pcscd_running; then
+		print_info "pcscd isn't running; starting pcscd"
+		start_pcscd
+	fi
+
+	if [ ! -z $path ]; then
+		run_sample $spy_option $log_option $device $path
+	else
+		print_error "no path supplied"
+		usage
+		exit 1
+	fi
+}
+
+main $*
