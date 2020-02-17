@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ./rtm_api.sh
+. /opt/Rutoken/scripts/include/rt-api
 
 usage(){
 	echo "Usage: sudo ./rtuart_test.sh [option]"
@@ -26,12 +26,17 @@ check_configuration(){
 	return
 }
 
+trasport_test(){
+
+	/opt/Rutoken/bin/rtuart_transport_test $1
+}
+
 run(){
 
 	exit_if_not_root
-	
+
 	if check_configuration; then
-		/usr/bin/rtuart_transport_test /dev/ttyAMA0
+		trasport_test /dev/ttyAMA0
 	fi
 }
 
@@ -44,9 +49,9 @@ force_run(){
 		pcscd_was_running=true
 	fi
 
-	clear_gpio22
-	
-	/usr/bin/rtuart_transport_test /dev/ttyAMA0
+	set_interface_uart
+
+	trasport_test /dev/ttyAMA0
 
 	if $pcscd_was_running; then
 		start_pcscd

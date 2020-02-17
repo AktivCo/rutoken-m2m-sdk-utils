@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ./rtm_api.sh
+. /opt/Rutoken/scripts/include/rt-api
 
 usage(){
 	echo "Usage: sudo ./rtm_run_sample.sh [ options ] -p <path> "
@@ -19,7 +19,7 @@ usage(){
 }
 
 check_device(){
-	
+
 	if ! echo $OPTARG | grep -Eq '^(uart|usb|all)'; then
 		print_error "Device $OPTARG doesn't exist"
 		exit 1
@@ -42,8 +42,11 @@ run_sample(){
 	sample=$(realpath $4 / | head -n 1)
 	sample_name=$( echo "$sample" | awk -F "/" '{print $NF}')
 
-	#change it if you have another user
-	user="m2mib"
+	user=$(echo $SUDO_USER)
+	if [ -z $user ]; then
+		user=$(who am i | awk '{print $1}')
+	fi
+
 	home=$(sudo -u $user sh -c "cd ~$user && pwd")
 
 	pcsc_spy_fifo="$home/pcsc-spy"
@@ -68,7 +71,7 @@ run_sample(){
 		sudo -u $user -H sh -c "cat $pcsc_spy_fifo > $pcsc_spy_raw_out &"
 		cat_pid=$!
 		pcsc_spy_out="$log_dir/$sample_name-pcsc-spy.log"
-	fi 
+	fi
 
 	if $log; then
 		print_info "$sample_name work in progress, please wait"
@@ -87,7 +90,7 @@ run_sample(){
 		if ps -C -p $cat_pid 1>/dev/null; then
 			kill $cat_pid
 		fi
-		
+
 		rm $pcsc_spy_fifo $pcsc_spy_raw_out
 
 	fi

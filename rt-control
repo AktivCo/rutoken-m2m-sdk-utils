@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. ./rtm_api.sh
+. /opt/Rutoken/scripts/include/rt-api
 
 usage(){
 	echo "Usage: sudo ./rtm_control.sh <command> [command options]"
@@ -10,7 +10,6 @@ usage(){
 	echo "                      usb             select only Rutoken ECP TSSOP to be used over PCSC"
 	echo "                      uart            select only Rutoken ECP B to be used over PCSC"
 	echo "                      all             select both devices to be used over PCSC"
-	echo -e "                                      \e[31mIMPORTANT!\e[0m \e[1mEnable all devices before reboot or poweroff!\e[0m"
 	echo " "
 	echo "          -c, --change_interface  <interface>    changes interfaces between Rutoken ECP SC and Rutoken ECP B"
 	echo "          Interfaces:"
@@ -69,7 +68,7 @@ start_stop_pcscd(){
 }
 
 make_uart_available(){
-	
+
 	if ! is_interface_uart; then
 		print_info "selected interface is Rutoken ECP SC; changing interface to Rutoken ECP B"
 		change_interface uart
@@ -79,7 +78,7 @@ make_uart_available(){
 set_device(){
 
 	check_arg $1
-	
+
 	select_device $1
 
 	case $1 in
@@ -107,10 +106,9 @@ change_interface(){
 		pcscd_was_running=true
 	fi
 
-	clear_gpio22
-
 	case $1 in
 		uart)
+			set_interface_uart
 			print_succeed "interface changed to Rutoken ECP B"
 		;;
 		sc)
@@ -179,7 +177,7 @@ info(){
 }
 
 check_numeric(){
-	
+
 	if ! echo $OPTARG | grep -Eq "^(0[xX][0-9a-fA-F]+|[0-9]+)$"; then
 		print_error "Argument $OPTARG must be decimal or hexadecimal number for option -$opt!"
 		exit 1
@@ -192,11 +190,11 @@ set_log_levels(){
 
 	while getopts ":c:u:" opt; do
 		case $opt in
-			c)	
+			c)
 				check_numeric
 				ccid_lvl=$OPTARG
 			;;
-			u)	
+			u)
 				check_numeric
 				rtuart_lvl=$OPTARG
 			;;
@@ -208,7 +206,7 @@ set_log_levels(){
 				print_error "Invalid option: -$OPTARG!"
 				exit 1
 			;;
-			*)	
+			*)
 				print_succeed "Run pcscd with previous log settings"
 			;;
 		esac
@@ -221,7 +219,7 @@ set_log_levels(){
 	if [ -z "$ccid_lvl" ]; then
 		ccid_lvl=3
 	fi
-	
+
 	if [ -z "$rtuart_lvl" ]; then
 		rtuart_lvl=3
 	fi
@@ -241,7 +239,7 @@ set_log_levels(){
 }
 
 disable_log(){
-	
+
 	exit_if_not_root
 	init_log
 	echo " " > $log_config_path

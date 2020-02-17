@@ -1,25 +1,25 @@
 #!/bin/sh
 
 
-#this script used as a library in other rtsdk utils
+#this script used as a library in other rt-utils
 
 print_error(){
-
+	echo " "
 	echo -e "[\e[31mError:\e[0m \e[1m$1\e[0m]"
 }
 
 print_succeed(){
-
+	echo " "
 	echo -e "[\e[32mSuccess:\e[0m \e[1m$1\e[0m]"
 }
 
 print_info(){
-
+	echo " "
 	echo -e "[\e[93mInfo:\e[0m \e[1m$1\e[0m]"
 }
 
 exit_if_not_root(){
-	
+
 	user_id=$(id -u)
 	if [ "$user_id" -ne 0 ]; then
 		print_error "run as root"
@@ -48,9 +48,12 @@ stop_pcscd(){
 	exit_if_not_root
 
 	if is_pcscd_running; then
-		kill $pcscd_pid 1>/dev/null 2>/dev/null
-		exit_if_not_root $?
-		sleep 1
+		kill $pcscd_pid
+		timeout 5 sh -c "while true; do [ ! -d "/proc/$pcscd_pid" ] && exit 0; done"
+		if [ $? -ne 0 ]; then
+			print_error "can't kill pcscd"
+			exit 1
+		fi
 		true
 	else
 		false
@@ -60,7 +63,7 @@ stop_pcscd(){
 }
 
 init_log(){
-	
+
 	log_config_path="/tmp/rtm_log.config"
 
 	if [ ! -f $log_config_path ]; then
@@ -73,7 +76,7 @@ init_log(){
 }
 
 read_log_config(){
-	
+
 	init_log
 
 	pcscd_flags=$(cat $log_config_path | grep pcscd_flags | cut -d '=' -f2)
@@ -86,16 +89,14 @@ read_log_config(){
 start_pcscd(){
 
 	exit_if_not_root
-	
+
 	if is_pcscd_running; then
 		false
 	else
 		read_log_config
-		
-		env_variables="$ccid_env $rtuart_env"
 
+		env_variables="$ccid_env $rtuart_env"
 		sh -c "$env_variables start-stop-daemon -SbC -x /usr/sbin/pcscd -- $pcscd_flags 1>/dev/null 2>/dev/null"
-		sleep 1
 		is_pcscd_running
 		if [ $? -eq 1 ]; then
 			print_error "pcscd is unable to start"
@@ -112,33 +113,34 @@ unplug_usb(){
 	exit_if_not_root
 
 	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
-	found=$(cat /tmp/.pcsc_scan.out | grep ATR | wc -l)
+	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
 	rm /tmp/.pcsc_scan.out
-	if [ ! $found -eq 2 ]; then
+	if [ -z "$found" ]; then
 		stop_pcscd
-		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/libccid.so /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/.libccid.so 2>/dev/null
+		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle /usr/lib/pcsc/drivers/.ifd-ccid.bundle
 		start_pcscd
 	fi
 }
 
 plug_usb(){
-	
+
 	exit_if_not_root
 
 	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
-	found=$(cat /tmp/.pcsc_scan.out | grep ATR | wc -l)
+	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
 	rm /tmp/.pcsc_scan.out
-	if [ ! $found -ne 2 ]; then
+	if [ -z "$found" ]; then
 		stop_pcscd
-		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/.libccid.so /usr/lib/pcsc/drivers/ifd-ccid.bundle/Contents/Linux/libccid.so 2>/dev/null
+		mv /usr/lib/pcsc/drivers/.ifd-ccid.bundle /usr/lib/pcsc/drivers/ifd-ccid.bundle
 		start_pcscd
 	fi
 }
 
+#unbinding usb device is unsafe due to complete device removal from system device tree after reboot if it was unbind previously
 unplug_usb_unsafe(){
 
 	exit_if_not_root
-	
+
 	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
 	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
 	rm /tmp/.pcsc_scan.out
@@ -150,7 +152,7 @@ unplug_usb_unsafe(){
 plug_usb_unsafe(){
 
 	exit_if_not_root
-	
+
 	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
 	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
 	rm /tmp/.pcsc_scan.out
@@ -181,15 +183,15 @@ select_device(){
 
 	case $1 in
 			usb)
-				plug_usb_unsafe
+				plug_usb
 				unplug_uart
 			;;
 			uart)
 				plug_uart
-				unplug_usb_unsafe
+				unplug_usb
 			;;
 			all)
-				plug_usb_unsafe
+				plug_usb
 				plug_uart
 			;;
 			*)
@@ -200,10 +202,10 @@ select_device(){
 }
 
 restore_devices(){
-	
+
 	case $1 in
 		usb)  plug_uart ;;
-		uart) plug_usb_unsafe  ;;
+		uart) plug_usb  ;;
 		all);;
 		*)
 			print_error "no such device"
@@ -225,7 +227,7 @@ is_interface_uart(){
 	fi
 
 	gpio22_value=$(cat /sys/class/gpio/gpio22/value)
-	
+
 	gpio22_active_low=$(cat /sys/class/gpio/gpio22/active_low)
 
 	if [ $gpio22_value -eq $gpio22_active_low ]; then
@@ -239,8 +241,6 @@ is_interface_uart(){
 
 clear_gpio22(){
 
-	exit_if_not_root
-	
 	if [ -d /sys/class/gpio/gpio22 ]; then
 		echo '22' > /sys/class/gpio/unexport
 	fi
@@ -250,9 +250,22 @@ set_interface_sc(){
 
 	exit_if_not_root
 
+	clear_gpio22
+
 	echo '22' > /sys/class/gpio/export
-
 	echo 'out' > /sys/class/gpio/gpio22/direction
+	echo '1' > /sys/class/gpio/gpio22/active_low
+	echo '0' > /sys/class/gpio/gpio22/value
+}
 
+set_interface_uart(){
+
+	exit_if_not_root
+
+	clear_gpio22
+
+	echo '22' > /sys/class/gpio/export
+	echo 'out' > /sys/class/gpio/gpio22/direction
+	echo '1' > /sys/class/gpio/gpio22/active_low
 	echo '1' > /sys/class/gpio/gpio22/value
 }
