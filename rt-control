@@ -3,7 +3,7 @@
 . /opt/Rutoken/scripts/include/rt-api
 
 usage(){
-	echo "Usage: sudo ./rtm_control.sh <command> [command options]"
+	echo "Usage: sudo ./rt-control <command> [command options]"
 	echo "Commands:"
 	echo "          -s, --select_device     <device>       configure and select device to use in SDK samples (implicitly starts pcscd)"
 	echo "          Devices:"
@@ -167,13 +167,50 @@ info(){
 
 	rutoken_sc_pcsc="\e[31m not available \e[0m"
 
+	read_log_config
+
+	if [ -z "$pcscd_flags" ]; then
+		pcscd_logging="\e[31m disabled \e[0m"
+		ccid_logging="\e[31m disabled \e[0m"
+		ccid_log_level=0
+		rtuart_logging="\e[31m disabled \e[0m"
+		rtuart_log_level=0
+	else
+		pcscd_logging="\e[32m enabled \e[0m"
+		ccid_logging="\e[32m enabled \e[0m"
+		ccid_log_level=$(echo $ccid_env | cut -d "=" -f2)
+		if [ $ccid_log_level -eq 0 ]; then
+			ccid_logging="\e[31m disabled \e[0m"
+		fi
+		rtuart_logging="\e[32m enabled \e[0m"
+		rtuart_log_level=$(echo $rtuart_env | cut -d "=" -f2)
+		if [ $rtuart_log_level -eq 0 ]; then
+			rtuart_logging="\e[31m disabled \e[0m"
+		fi
+
+	fi
+
+	echo " "
+	echo -e "Devices' physical state information:"
 	echo -e "Rutoken ECP TSSOP (usb)      $rutoken_tssop to RPi2"
 	echo -e "Rutoken ECP B     (uart)     $rutoken_ecpb to RPi2"
 	echo -e "Rutoken ECP SC    (microsim) $rutoken_sc to RPi2"
+	echo " "
+	echo -e "Devices' availiability information:"
 	echo -e "pcscd                        is $pcscd"
 	echo -e "Rutoken ECP TSSOP (usb)      is $rutoken_tssop_pcsc over PCSC"
 	echo -e "Rutoken ECP B     (uart)     is $rutoken_ecpb_pcsc over PCSC"
 	echo -e "Rutoken ECP SC    (microsim) is $rutoken_sc_pcsc over PCSC"
+	echo " "
+	echo -e "Logging information:"
+	echo -e "pcscd"
+	echo -e "        logging    $pcscd_logging"
+	echo -e "ccid"
+	echo -e "        logging    $ccid_logging"
+	echo -e "        log level   $ccid_log_level"
+	echo -e "rtuart"
+	echo -e "        logging    $rtuart_logging"
+	echo -e "        log level   $rtuart_log_level"
 }
 
 check_numeric(){

@@ -3,7 +3,7 @@
 . /opt/Rutoken/scripts/include/rt-api
 
 usage(){
-	echo "Usage: sudo ./rtm_run_sample.sh [ options ] -p <path> "
+	echo "Usage: sudo ./rt-run-sample [ options ] -p <path> "
 	echo "Options:"
 	echo "          -h                               see help message"
 	echo "          -s                               enable pcsc-spy logging of the sample"	

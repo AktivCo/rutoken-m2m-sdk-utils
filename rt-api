@@ -107,34 +107,6 @@ start_pcscd(){
 	return
 }
 
-unplug_usb(){
-
-	exit_if_not_root
-
-	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
-	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
-	rm /tmp/.pcsc_scan.out
-	if [ -z "$found" ]; then
-		stop_pcscd
-		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle /usr/lib/pcsc/drivers/.ifd-ccid.bundle
-		start_pcscd
-	fi
-}
-
-plug_usb(){
-
-	exit_if_not_root
-
-	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
-	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
-	rm /tmp/.pcsc_scan.out
-	if [ -z "$found" ]; then
-		stop_pcscd
-		mv /usr/lib/pcsc/drivers/.ifd-ccid.bundle /usr/lib/pcsc/drivers/ifd-ccid.bundle
-		start_pcscd
-	fi
-}
-
 #unbinding usb device is unsafe due to complete device removal from system device tree after reboot if it was unbind previously
 unplug_usb_unsafe(){
 
@@ -174,6 +146,49 @@ plug_uart(){
 	if [ ! -f /etc/reader.conf.d/librtuart ]; then
 		stop_pcscd
 		mv /etc/reader.conf.d/.librtuart /etc/reader.conf.d/librtuart 2>/dev/null
+		start_pcscd
+	fi
+}
+
+
+is_usb_connected(){
+
+	if  lsusb | grep -q "0a89:0030"; then
+		true
+	else
+		false
+	fi
+	return
+}
+
+unplug_usb(){
+
+	exit_if_not_root
+
+	if ! is_usb_connected; then
+		print_error "can't unplug; usb device physically unplugged"
+		exit 1
+	fi
+
+	if [ -d /usr/lib/pcsc/drivers/ifd-ccid.bundle ]; then
+		stop_pcscd
+		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle /usr/lib/pcsc/drivers/.ifd-ccid.bundle
+		start_pcscd
+	fi
+}
+
+plug_usb(){
+
+	exit_if_not_root
+
+	if ! is_usb_connected; then
+		print_error "can't plug; usb device physically unplugged"
+		exit 1
+	fi
+
+	if [ ! -d /usr/lib/pcsc/drivers/ifd-ccid.bundle ]; then
+		stop_pcscd
+		mv /usr/lib/pcsc/drivers/.ifd-ccid.bundle /usr/lib/pcsc/drivers/ifd-ccid.bundle
 		start_pcscd
 	fi
 }

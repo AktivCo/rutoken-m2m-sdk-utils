@@ -3,7 +3,7 @@
 . /opt/Rutoken/scripts/include/rt-api
 
 usage(){
-	echo "Usage: sudo ./rtuart_test.sh [option]"
+	echo "Usage: sudo ./rt-uart-test [option]"
 	echo "Options:"
 	echo "        -f, --force   force run sample; configurate system if needed"
 	echo "                         if -f option is not used rtuart_control will not run sample if system misconfigured"
