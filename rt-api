@@ -96,9 +96,8 @@ start_pcscd(){
 		read_log_config
 
 		env_variables="$ccid_env $rtuart_env"
-		sh -c "$env_variables start-stop-daemon -SbC -x /usr/sbin/pcscd -- $pcscd_flags 1>/dev/null 2>/dev/null"
-		is_pcscd_running
-		if [ $? -eq 1 ]; then
+		sh -c "$env_variables start-stop-daemon -SbC -p /var/run/pcscd/pcscd.pid -x /usr/sbin/pcscd -- $pcscd_flags 1>/dev/null 2>/dev/null"
+		if [ $? -ne 0 ]; then
 			print_error "pcscd is unable to start"
 			exit 1
 		fi
