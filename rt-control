@@ -5,22 +5,22 @@
 usage(){
 	echo "Usage: sudo ./rt-control <command> [command options]"
 	echo "Commands:"
-	echo "          -s, --select_device     <device>       configure and select device to use in SDK samples (implicitly starts pcscd)"
+	echo "          -s, --select_device     <device>       configure and select the device to be seen by PC/SC driver (implicitly starts pcscd)"
 	echo "          Devices:"
-	echo "                      usb             select only Rutoken ECP TSSOP to be used over PCSC"
-	echo "                      uart            select only Rutoken ECP B to be used over PCSC"
-	echo "                      all             select both devices to be used over PCSC"
+	echo "                      usb             select only Rutoken 2010 SoC to be seen by PC/SC driver"
+	echo "                      uart            select only Rutoken 4010 SOM to be seen by PC/SC driver"
+	echo "                      all             select both devices to be seen by PC/SC driver"
 	echo " "
-	echo "          -c, --change_interface  <interface>    changes interfaces between Rutoken ECP SC and Rutoken ECP B"
+	echo "          -c, --change_interface  <interface>    change interfaces between MicroSIM and SOM embedded modules"
 	echo "          Interfaces:"
-	echo "                      uart           change interface to Rutoken ECP B"
-	echo "                      sc             change interface to Rutoken ECP SC"
+	echo "                      uart           change interface to Rutoken 4010 SOM"
+	echo "                      sc             change interface to Rutoken 2151/2100 MicroSIM"
 	echo " "
-	echo "          -d, --disable_log                     disable pcscd logging (implicitly disables CCID and Rutoken UART drivers logs)"
+	echo "          -d, --disable_log                     disable pcscd logging (implicitly disables CCID and Rutoken 4010 SOM uart drivers logs)"
 	echo "          -l, --log_level                       change logging settings (call without additional flags will set default log level for both drivers)"
 	echo "          Flags:"
 	echo "                      -c  <level>    set log level for CCID driver"
-	echo "                      -u  <level>    set log level for Rutoken UART driver"
+	echo "                      -u  <level>    set log level for Rutoken 4010 SOM uart driver"
 	echo " "
 	echo "          -p, --pcscd  <start|stop|restart>      start, stop or restart pcscd"
 	echo "          -i, --info                             see information about current working interfaces"
@@ -45,14 +45,14 @@ start_stop_pcscd(){
 			if start_pcscd; then
 				print_succeed "pcscd started"
 			else
-				print_info "pcscd already running; Nothing done"
+				print_info "pcscd is already running; Nothing done"
 			fi
 		;;
 		stop)
 			if stop_pcscd; then
 				print_succeed "pcscd stopped"
 			else
-				print_info "pcscd isn't running; Nothing done"
+				print_info "pcscd is not running; Nothing done"
 			fi
 		;;
 		restart)
@@ -70,7 +70,7 @@ start_stop_pcscd(){
 make_uart_available(){
 
 	if ! is_interface_uart; then
-		print_info "selected interface is Rutoken ECP SC; changing interface to Rutoken ECP B"
+		print_info "selected interface is Rutoken 2151/2100 MicroSIM; changing interface to Rutoken 4010 SOM"
 		change_interface uart
 	fi
 }
@@ -83,11 +83,11 @@ set_device(){
 
 	case $1 in
 		usb)
-			print_succeed "Rutoken ECP TSSOP device selected"
+			print_succeed "Rutoken 2010 SoC device selected"
 		;;
 		uart)
 			make_uart_available
-			print_succeed "Rutoken ECP B device selected"
+			print_succeed "Rutoken 4010 SOM device selected"
 		;;
 		all)
 			make_uart_available
@@ -109,11 +109,11 @@ change_interface(){
 	case $1 in
 		uart)
 			set_interface_uart
-			print_succeed "interface changed to Rutoken ECP B"
+			print_succeed "interface changed to Rutoken 4010 SOM"
 		;;
 		sc)
 			set_interface_sc
-			print_succeed "interface changed to Rutoken ECP SC"
+			print_succeed "interface changed to Rutoken 2151/2100 MicroSIM"
 		;;
 		*)
 			print_error "invalid option"
@@ -131,76 +131,76 @@ change_interface(){
 info(){
 
 	if lsusb | grep -q "0a89:0030"; then
-		rutoken_tssop="\e[32m connected     \e[0m"
+		rutoken_soc="${Green} connected     ${End}"
 	else
-		rutoken_tssop="\e[31m not connected \e[0m"
+		rutoken_soc="${Red} not connected ${End}"
 	fi
 
 	if is_interface_uart; then
-		rutoken_ecpb="\e[32m connected     \e[0m"
-		rutoken_sc="\e[31m not connected \e[0m"
+		rutoken_som="${Green} connected     ${End}"
+		rutoken_microsim="${Red} not connected ${End}"
 	else
-		rutoken_ecpb="\e[31m not connected \e[0m "
-		rutoken_sc="\e[32m connected     \e[0m "
+		rutoken_som="${Red} not connected ${End} "
+		rutoken_microsim="${Green} connected     ${End} "
 	fi
 
 	if is_pcscd_running; then
-		pcscd="\e[32m running     \e[0m"
+		pcscd="${Green} running     ${End}"
 	else
-		pcscd="\e[31m not running \e[0m"
+		pcscd="${Red} not running ${End}"
 	fi
 
 	timeout 1 pcsc_scan 1> /tmp/.pcsc_scan_info 2>/dev/null
 	if grep -q "Aktiv Rutoken ECP" /tmp/.pcsc_scan_info; then
-		rutoken_tssop_pcsc="\e[32m available     \e[0m"
+		rutoken_soc_pcsc="${Green} available     ${End}"
 	else
-		rutoken_tssop_pcsc="\e[31m not available \e[0m"
+		rutoken_soc_pcsc="${Red} not available ${End}"
 	fi
 
 	if grep -q "Rutoken ECP B" /tmp/.pcsc_scan_info; then
-		rutoken_ecpb_pcsc="\e[32m available     \e[0m"
+		rutoken_som_pcsc="${Green} available     ${End}"
 	else
-		rutoken_ecpb_pcsc="\e[31m not available \e[0m"
+		rutoken_som_pcsc="${Red} not available ${End}"
 	fi
 
 	rm /tmp/.pcsc_scan_info
 
-	rutoken_sc_pcsc="\e[31m not available \e[0m"
+	rutoken_microsim_pcsc="${Red} not available ${End}"
 
 	read_log_config
 
 	if [ -z "$pcscd_flags" ]; then
-		pcscd_logging="\e[31m disabled \e[0m"
-		ccid_logging="\e[31m disabled \e[0m"
+		pcscd_logging="${Red} disabled ${End}"
+		ccid_logging="${Red} disabled ${End}"
 		ccid_log_level=0
-		rtuart_logging="\e[31m disabled \e[0m"
+		rtuart_logging="${Red} disabled ${End}"
 		rtuart_log_level=0
 	else
-		pcscd_logging="\e[32m enabled \e[0m"
-		ccid_logging="\e[32m enabled \e[0m"
+		pcscd_logging="${Green} enabled ${End}"
+		ccid_logging="${Green} enabled ${End}"
 		ccid_log_level=$(echo $ccid_env | cut -d "=" -f2)
 		if [ $ccid_log_level -eq 0 ]; then
-			ccid_logging="\e[31m disabled \e[0m"
+			ccid_logging="${Red} disabled ${End}"
 		fi
-		rtuart_logging="\e[32m enabled \e[0m"
+		rtuart_logging="${Green} enabled ${End}"
 		rtuart_log_level=$(echo $rtuart_env | cut -d "=" -f2)
 		if [ $rtuart_log_level -eq 0 ]; then
-			rtuart_logging="\e[31m disabled \e[0m"
+			rtuart_logging="${Red} disabled ${End}"
 		fi
 
 	fi
 
 	echo " "
 	echo -e "Devices' physical state information:"
-	echo -e "Rutoken ECP TSSOP (usb)      $rutoken_tssop to RPi2"
-	echo -e "Rutoken ECP B     (uart)     $rutoken_ecpb to RPi2"
-	echo -e "Rutoken ECP SC    (microsim) $rutoken_sc to RPi2"
+	echo -e "Rutoken 2010      SoC      $rutoken_soc to RPi2"
+	echo -e "Rutoken 4010      SOM      $rutoken_som to RPi2"
+	echo -e "Rutoken 2151/2100 MicroSIM $rutoken_microsim to RPi2"
 	echo " "
 	echo -e "Devices' availiability information:"
 	echo -e "pcscd                        is $pcscd"
-	echo -e "Rutoken ECP TSSOP (usb)      is $rutoken_tssop_pcsc over PCSC"
-	echo -e "Rutoken ECP B     (uart)     is $rutoken_ecpb_pcsc over PCSC"
-	echo -e "Rutoken ECP SC    (microsim) is $rutoken_sc_pcsc over PCSC"
+	echo -e "Rutoken 2010      SoC        is $rutoken_soc_pcsc over PC/SC driver"
+	echo -e "Rutoken 4010      SOM        is $rutoken_som_pcsc over PC/SC driver"
+	echo -e "Rutoken 2151/2100 MicroSIM   is $rutoken_microsim_pcsc over PC/SC driver"
 	echo " "
 	echo -e "Logging information:"
 	echo -e "pcscd"

@@ -6,7 +6,7 @@ usage(){
 	echo "Usage: sudo ./rt-uart-test [option]"
 	echo "Options:"
 	echo "        -f, --force   force run sample; configurate system if needed"
-	echo "                         if -f option is not used rtuart_control will not run sample if system misconfigured"
+	echo "                      if -f option is not specified sample won't start if system misconfigured"
 	echo "        -h, --help    see this message"
 }
 

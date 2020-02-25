@@ -3,19 +3,26 @@
 
 #this script used as a library in other rt-utils
 
+Bold='\e[1m'
+Red='\e[31m'
+Green='\e[32m'
+Yellow='\e[93m'
+End='\e[0m'
+
+
 print_error(){
 	echo " "
-	echo -e "[\e[31mError:\e[0m \e[1m$1\e[0m]"
+	echo -e "${Red}Error${End}: ${Bold}$1${End}"
 }
 
 print_succeed(){
 	echo " "
-	echo -e "[\e[32mSuccess:\e[0m \e[1m$1\e[0m]"
+	echo -e "${Green}Success${End}: ${Bold}$1${End}"
 }
 
 print_info(){
 	echo " "
-	echo -e "[\e[93mInfo:\e[0m \e[1m$1\e[0m]"
+	echo -e "${Yellow}Info${End}: ${Bold}$1${End}"
 }
 
 exit_if_not_root(){
