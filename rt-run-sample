@@ -18,18 +18,10 @@ usage(){
 	echo "          -p  <path>                       path to sample to run"
 }
 
-check_device(){
-
-	if ! echo $OPTARG | grep -Eq '^(uart|usb|all)'; then
-		print_error "Device $OPTARG doesn't exist"
-		exit 1
-	fi
-}
-
 check_sample(){
 
-	if [ ! -f $OPTARG ]; then
-		print_error "Sample $OPTARG doesn't exist"
+	if [ ! -f $1 ]; then
+		print_error "no such sample: $1"
 		exit 1
 	fi
 }
@@ -119,11 +111,11 @@ main(){
 			;;
 			l)	log_option=true
 			;;
-			d)	check_device
-				device=$OPTARG
+			d)	device=$OPTARG
+				check_device "$device"
 			;;
-			p)	check_sample
-				path=$OPTARG
+			p)	path=$OPTARG
+				check_sample "$path"
 			;;
 			*)	usage
 				exit 1

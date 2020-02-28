@@ -8,7 +8,7 @@ Red='\e[31m'
 Green='\e[32m'
 Yellow='\e[93m'
 End='\e[0m'
-
+Purple='\e[35m'
 
 print_error(){
 	echo " "
@@ -56,8 +56,8 @@ stop_pcscd(){
 
 	if is_pcscd_running; then
 		kill $pcscd_pid
-		timeout 5 sh -c "while true; do [ ! -d "/proc/$pcscd_pid" ] && exit 0; done"
-		if [ $? -ne 0 ]; then
+		timeout 5 sh -c 'while true; do start-stop-daemon -T -p /var/run/pcscd/pcscd.pid; if [ $? -eq 3 ]; then exit 3; fi; done'
+		if [ $? -ne 3 ]; then
 			print_error "can't kill pcscd"
 			exit 1
 		fi
@@ -104,13 +104,33 @@ start_pcscd(){
 
 		env_variables="$ccid_env $rtuart_env"
 		sh -c "$env_variables start-stop-daemon -SbC -p /var/run/pcscd/pcscd.pid -x /usr/sbin/pcscd -- $pcscd_flags 1>/dev/null 2>/dev/null"
-		if [ $? -ne 0 ]; then
-			print_error "pcscd is unable to start"
+		timeout 5 sh -c 'while true; do start-stop-daemon -T -p /var/run/pcscd/pcscd.pid; if [ $? -eq 0 ]; then exit 0; fi; done'
+		if [ $? -ne 0 ] ; then
+			print_error "can't start pcscd"
 			exit 1
 		fi
 		true
 	fi
 
+	return
+}
+
+
+check_device(){
+
+	if ! echo $1 | grep -Eq '^(uart|usb|all)'; then
+		print_error "no such device: $1"
+		exit 1
+	fi
+}
+
+is_usb_connected(){
+
+	if  lsusb | grep -q "0a89:0030"; then
+		true
+	else
+		false
+	fi
 	return
 }
 
@@ -142,30 +162,15 @@ plug_usb_unsafe(){
 unplug_uart(){
 
 	if [ -f /etc/reader.conf.d/librtuart ]; then
-		stop_pcscd
 		mv /etc/reader.conf.d/librtuart /etc/reader.conf.d/.librtuart 2>/dev/null
-		start_pcscd
 	fi
 }
 
 plug_uart(){
 
 	if [ ! -f /etc/reader.conf.d/librtuart ]; then
-		stop_pcscd
 		mv /etc/reader.conf.d/.librtuart /etc/reader.conf.d/librtuart 2>/dev/null
-		start_pcscd
 	fi
-}
-
-
-is_usb_connected(){
-
-	if  lsusb | grep -q "0a89:0030"; then
-		true
-	else
-		false
-	fi
-	return
 }
 
 unplug_usb(){
@@ -178,9 +183,7 @@ unplug_usb(){
 	fi
 
 	if [ -d /usr/lib/pcsc/drivers/ifd-ccid.bundle ]; then
-		stop_pcscd
 		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle /usr/lib/pcsc/drivers/.ifd-ccid.bundle
-		start_pcscd
 	fi
 }
 
@@ -194,14 +197,15 @@ plug_usb(){
 	fi
 
 	if [ ! -d /usr/lib/pcsc/drivers/ifd-ccid.bundle ]; then
-		stop_pcscd
 		mv /usr/lib/pcsc/drivers/.ifd-ccid.bundle /usr/lib/pcsc/drivers/ifd-ccid.bundle
-		start_pcscd
 	fi
 }
 
 select_device(){
 
+	check_device $1
+	
+	stop_pcscd
 	case $1 in
 			usb)
 				plug_usb
@@ -215,23 +219,17 @@ select_device(){
 				plug_usb
 				plug_uart
 			;;
-			*)
-				print_error "no such device"
-				exit 1
-			;;
 	esac
+	start_pcscd
 }
 
 restore_devices(){
 
+	check_device $1
+	
 	case $1 in
 		usb)  plug_uart ;;
 		uart) plug_usb  ;;
-		all);;
-		*)
-			print_error "no such device"
-			exit 1
-		;;
 	esac
 }
 

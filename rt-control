@@ -34,7 +34,7 @@ usage(){
 
 check_arg(){
 
-	if [ -z "$1" ]; then
+	if [ -z $1 ]; then
 		print_error "no argument supplied"
 		usage
 		exit 1
@@ -84,18 +84,21 @@ set_device(){
 
 	check_arg $1
 
-	select_device $1
+	check_device $1
 
 	case $1 in
 		usb)
+			select_device $1
 			print_succeed "Rutoken 2010 SoC device selected"
 		;;
 		uart)
 			make_uart_available
+			select_device $1
 			print_succeed "Rutoken 4010 SOM device selected"
 		;;
 		all)
 			make_uart_available
+			select_device $1
 			print_succeed "all Rutoken devices are selected"
 		;;
 	esac
@@ -136,17 +139,17 @@ change_interface(){
 info(){
 
 	if lsusb | grep -q "0a89:0030"; then
-		rutoken_soc="${Green} connected     ${End}"
+		rutoken_soc="${Green} connected      ${End}"
 	else
-		rutoken_soc="${Red} not connected ${End}"
+		rutoken_soc="${Red} not connected  ${End}"
 	fi
 
 	if is_interface_uart; then
-		rutoken_som="${Green} connected     ${End}"
-		rutoken_microsim="${Red} not connected ${End}"
+		rutoken_som="${Green} connected      ${End}"
+		rutoken_microsim="${Red} not connected  ${End}"
 	else
-		rutoken_som="${Red} not connected ${End} "
-		rutoken_microsim="${Green} connected     ${End} "
+		rutoken_som="${Red} not connected  ${End}"
+		rutoken_microsim="${Green} connected      ${End}"
 	fi
 
 	if is_pcscd_running; then
@@ -181,42 +184,54 @@ info(){
 		rtuart_logging="${Red} disabled ${End}"
 		rtuart_log_level=0
 	else
-		pcscd_logging="${Green} enabled ${End}"
-		ccid_logging="${Green} enabled ${End}"
+		pcscd_logging="${Green} enabled  ${End}"
+		ccid_logging="${Green} enabled  ${End}"
 		ccid_log_level=$(echo $ccid_env | cut -d "=" -f2)
 		if [ $ccid_log_level -eq 0 ]; then
 			ccid_logging="${Red} disabled ${End}"
 		fi
-		rtuart_logging="${Green} enabled ${End}"
+		rtuart_logging="${Green} enabled  ${End}"
 		rtuart_log_level=$(echo $rtuart_env | cut -d "=" -f2)
 		if [ $rtuart_log_level -eq 0 ]; then
 			rtuart_logging="${Red} disabled ${End}"
 		fi
+	fi
 
+	if [ "$ccid_log_level" -lt "10" ]; then
+		ccid_log_level="$ccid_log_level "
+	fi
+	
+	if [ "$rtuart_log_level" -lt "10" ]; then
+		rtuart_log_level="$rtuart_log_level "
 	fi
 
 	echo " "
-	echo -e "Devices physical state information:"
-	echo -e "Rutoken 2010      SoC      $rutoken_soc to RPi2"
-	echo -e "Rutoken 4010      SOM      $rutoken_som to RPi2"
-	echo -e "Rutoken 2151/2100 MicroSIM $rutoken_microsim to RPi2"
+	echo -e "${Purple}Devices physical state information${End}■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e " Rutoken 2010      SoC      (usb)      $rutoken_soc to RPi2 ■"
+	echo -e " Rutoken 4010      SOM      (uart)     $rutoken_som to RPi2 ■"
+	echo -e " Rutoken 2151/2100 MicroSIM (sc)       $rutoken_microsim to RPi2 ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo " "
-	echo -e "pcscd                        is $pcscd"
+	echo -e "${Purple}PCSCD${End}■■■■■■■■■"
+	echo -e "$pcscd■"
+	echo "■■■■■■■■■■■■■■"
 	echo " "
-	echo -e "Devices availiability information:"
-	echo -e "Rutoken 2010      SoC        is $rutoken_soc_pcsc over PC/SC driver"
-	echo -e "Rutoken 4010      SOM        is $rutoken_som_pcsc over PC/SC driver"
-	echo -e "Rutoken 2151/2100 MicroSIM   is $rutoken_microsim_pcsc over PC/SC driver"
+	echo -e "${Purple}Devices availiability information${End}■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e " Rutoken 2010      SoC      (usb)   is $rutoken_soc_pcsc over PC/SC driver ■"
+	echo -e " Rutoken 4010      SOM      (uart)  is $rutoken_som_pcsc over PC/SC driver ■"
+	echo -e " Rutoken 2151/2100 MicroSIM (sc)    is $rutoken_microsim_pcsc over PC/SC driver ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo " "
-	echo -e "Logging information:"
-	echo -e "pcscd"
-	echo -e "        logging    $pcscd_logging"
-	echo -e "ccid"
-	echo -e "        logging    $ccid_logging"
-	echo -e "        log level   $ccid_log_level"
-	echo -e "rtuart"
-	echo -e "        logging    $rtuart_logging"
-	echo -e "        log level   $rtuart_log_level"
+	echo -e "${Purple}Logging information${End}■■■■■■■■■■■■■"
+	echo -e " pcscd   logging    $pcscd_logging ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e " ccid    logging    $ccid_logging ■"
+	echo -e "         log level   $ccid_log_level        ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e " rtuart  logging    $rtuart_logging ■"
+	echo -e "         log level   $rtuart_log_level        ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo " "
 }
 
 check_numeric(){
