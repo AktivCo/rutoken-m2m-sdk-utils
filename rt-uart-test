@@ -3,7 +3,7 @@
 . /opt/Rutoken/scripts/include/rt-api
 
 usage(){
-	echo "Usage: sudo ./rt-uart-test [option]"
+	echo "Usage: sudo rt-uart-test [option]"
 	echo "Options:"
 	echo "        -f, --force   force run test; configurate system if needed"
 	echo "                      if -f option is not specified test won't start if system misconfigured"
@@ -17,8 +17,8 @@ check_configuration(){
 		exit 1
 	fi
 
-	if ! is_interface_uart; then
-		print_error "current selected interface is misconfigured; change interface via 'sudo ./rtm_control.sh -c uart' or use -f option"
+	if ! is_4010_enabled; then
+		print_error "current selected interface is misconfigured; change interface via 'sudo rtm_control.sh -c uart' or use -f option"
 		exit 1
 	fi
 

@@ -3,7 +3,7 @@
 . /opt/Rutoken/scripts/include/rt-api
 
 usage(){
-	echo "Usage: sudo ./rt-run-sample [ options ] -p <path> "
+	echo "Usage: sudo rt-run-sample [ options ] -p <path> "
 	echo "Options:"
 	echo "          -h                               see help message"
 	echo "          -s                               enable pcsc-spy logging of the sample"	
@@ -11,8 +11,8 @@ usage(){
 	echo -e "                                        \e[1mall logs are created in /home/user/log directory\e[0m"
 	echo "          -d  <device>                     select device to run sample on"
 	echo "          Devices:"
-	echo "                      usb                  run sample on Rutoken 2010 SoC only"
-	echo "                      uart                 run sample on Rutoken 4010 SoM only"
+	echo "                      2010                 run sample on Rutoken 2010 SoC only"
+	echo "                      4010                 run sample on Rutoken 4010 SoM only"
 	echo "                      all                  run sample on both devices; this is default settings if -d option not provided"
 	echo " "
 	echo "          -p  <path>                       path to sample to run"
@@ -24,6 +24,26 @@ check_sample(){
 		print_error "no such sample: $1"
 		exit 1
 	fi
+}
+
+check_device(){
+
+	if ! echo $1| grep -Eq '^(4010|2010|all)'; then
+		print_error "Device $1 doesn't exist"
+		exit 1
+	fi
+}
+
+select_device(){
+
+	stop_pcscd
+
+	case $1 in
+		2010) enable_devices "on"  "off" "off";;
+		4010) enable devices "off" "on"  "off" ;;
+		all)  enable_devices "on"  "on"  "off";;
+	esac
+	start_pcscd
 }
 
 run_sample(){
@@ -87,7 +107,7 @@ run_sample(){
 
 	fi
 
-	restore_devices $device
+	enable_devices "on"  "on"  "off"
 }
 
 main(){

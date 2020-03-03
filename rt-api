@@ -7,8 +7,9 @@ Bold='\e[1m'
 Red='\e[31m'
 Green='\e[32m'
 Yellow='\e[93m'
-End='\e[0m'
 Purple='\e[35m'
+
+End='\e[0m'
 
 print_error(){
 	echo " "
@@ -115,15 +116,6 @@ start_pcscd(){
 	return
 }
 
-
-check_device(){
-
-	if ! echo $1 | grep -Eq '^(uart|usb|all)'; then
-		print_error "no such device: $1"
-		exit 1
-	fi
-}
-
 is_usb_connected(){
 
 	if  lsusb | grep -q "0a89:0030"; then
@@ -134,122 +126,38 @@ is_usb_connected(){
 	return
 }
 
-#unbinding usb device is unsafe due to complete device removal from system device tree after reboot if it was unbind previously
-unplug_usb_unsafe(){
+check_gpio_status(){
 
-	exit_if_not_root
-
-	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
-	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
-	rm /tmp/.pcsc_scan.out
-	if [ ! -z "$found" ]; then
-		sh -c "echo '1-1.2' > /sys/bus/usb/drivers/usb/unbind"
-	fi
-}
-
-plug_usb_unsafe(){
-
-	exit_if_not_root
-
-	timeout 1 pcsc_scan 1>/tmp/.pcsc_scan.out 2>/dev/null
-	found=$(grep "Aktiv Rutoken ECP" /tmp/.pcsc_scan.out)
-	rm /tmp/.pcsc_scan.out
-	if [ -z "$found" ]; then
-		sh -c "echo '1-1.2' > /sys/bus/usb/drivers/usb/bind"
-	fi
-}
-
-unplug_uart(){
-
-	if [ -f /etc/reader.conf.d/librtuart ]; then
-		mv /etc/reader.conf.d/librtuart /etc/reader.conf.d/.librtuart 2>/dev/null
-	fi
-}
-
-plug_uart(){
-
-	if [ ! -f /etc/reader.conf.d/librtuart ]; then
-		mv /etc/reader.conf.d/.librtuart /etc/reader.conf.d/librtuart 2>/dev/null
-	fi
-}
-
-unplug_usb(){
-
-	exit_if_not_root
-
-	if ! is_usb_connected; then
-		print_error "can't unplug; usb device physically unplugged"
-		exit 1
-	fi
-
-	if [ -d /usr/lib/pcsc/drivers/ifd-ccid.bundle ]; then
-		mv /usr/lib/pcsc/drivers/ifd-ccid.bundle /usr/lib/pcsc/drivers/.ifd-ccid.bundle
-	fi
-}
-
-plug_usb(){
-
-	exit_if_not_root
-
-	if ! is_usb_connected; then
-		print_error "can't plug; usb device physically unplugged"
-		exit 1
-	fi
-
-	if [ ! -d /usr/lib/pcsc/drivers/ifd-ccid.bundle ]; then
-		mv /usr/lib/pcsc/drivers/.ifd-ccid.bundle /usr/lib/pcsc/drivers/ifd-ccid.bundle
-	fi
-}
-
-select_device(){
-
-	check_device $1
-	
-	stop_pcscd
 	case $1 in
-			usb)
-				plug_usb
-				unplug_uart
-			;;
-			uart)
-				plug_uart
-				unplug_usb
-			;;
-			all)
-				plug_usb
-				plug_uart
-			;;
+		usb)
+			bcm=26
+		;;
+		uart)
+			bcm=23
+		;;
+		sc)
+			bcm=27
+		;;
+		interface)
+			bcm=22
+		;;
 	esac
-	start_pcscd
-}
 
-restore_devices(){
-
-	check_device $1
-	
-	case $1 in
-		usb)  plug_uart ;;
-		uart) plug_usb  ;;
-	esac
-}
-
-is_interface_uart(){
-
-	if [ ! -d /sys/class/gpio/gpio22 ]; then
+	if [ ! -d /sys/class/gpio/gpio$bcm ]; then
 		true
 		return
 	fi
 
-	if grep -q 'in' /sys/class/gpio/gpio22/direction; then
+	if grep -q 'in' /sys/class/gpio/gpio$bcm/direction; then
 		true
 		return
 	fi
 
-	gpio22_value=$(cat /sys/class/gpio/gpio22/value)
+	gpio_value=$(cat /sys/class/gpio/gpio$bcm/value)
 
-	gpio22_active_low=$(cat /sys/class/gpio/gpio22/active_low)
+	gpio_active_low=$(cat /sys/class/gpio/gpio$bcm/active_low)
 
-	if [ $gpio22_value -eq $gpio22_active_low ]; then
+	if [ $gpio_value -eq $gpio_active_low ]; then
 		true
 	else
 		false
@@ -258,33 +166,183 @@ is_interface_uart(){
 	return
 }
 
-clear_gpio22(){
+reset_gpio(){
 
-	if [ -d /sys/class/gpio/gpio22 ]; then
-		echo '22' > /sys/class/gpio/unexport
+	if [ -d "/sys/class/gpio/gpio$1" ]; then
+		echo $1 > /sys/class/gpio/unexport
 	fi
+
+	echo $1 > /sys/class/gpio/export
+}
+
+setup_gpio(){
+
+	reset_gpio $1
+
+	echo $2 > "/sys/class/gpio/gpio$1/direction"
+	if [ ! -z $3 ]; then
+		echo $3 > "/sys/class/gpio/gpio$1/value"
+	fi
+}
+
+switch_gpio_state(){
+
+	case $1 in
+		usb)
+			bcm=26
+		;;
+		uart)
+			bcm=23
+		;;
+		sc)
+			bcm=27
+		;;
+		interface)
+			bcm=22
+		;;
+	esac
+
+	power=0
+	if [ $2 = "off" ]; then
+		power=1
+	fi
+
+	setup_gpio $bcm 'out' $power
 }
 
 set_interface_sc(){
 
 	exit_if_not_root
-
-	clear_gpio22
-
-	echo '22' > /sys/class/gpio/export
-	echo 'out' > /sys/class/gpio/gpio22/direction
-	echo '1' > /sys/class/gpio/gpio22/active_low
-	echo '0' > /sys/class/gpio/gpio22/value
+	switch_gpio_state "interface" "off"
 }
+
 
 set_interface_uart(){
 
 	exit_if_not_root
+	switch_gpio_state "interface" "on"
+}
 
-	clear_gpio22
+is_interface_uart(){
+	if check_gpio_status "interface" ; then
+		true
+	else
+		false
+	fi
+	return
+}
 
-	echo '22' > /sys/class/gpio/export
-	echo 'out' > /sys/class/gpio/gpio22/direction
-	echo '1' > /sys/class/gpio/gpio22/active_low
-	echo '1' > /sys/class/gpio/gpio22/value
+hide_librtuart(){
+
+	if [ -f /etc/reader.conf.d/librtuart ]; then
+		mv /etc/reader.conf.d/librtuart /etc/reader.conf.d/.librtuart
+	fi
+}
+
+reveal_librtuart(){
+	if [ -f /etc/reader.conf.d/.librtuart ]; then
+		mv /etc/reader.conf.d/.librtuart /etc/reader.conf.d/librtuart
+	fi
+}
+
+is_librtuart_hidden(){
+	if [ -f /etc/reader.conf.d/.librtuart ]; then
+		true
+	else
+		false
+	fi
+	return
+}
+
+is_4010_enabled(){
+	if ! is_interface_uart; then
+		false
+		return
+	fi
+
+	check_gpio_status "uart"
+	if [ $? -ne 0 ]; then
+		false
+	fi
+
+	if is_librtuart_hidden; then
+		false
+		return
+	fi
+
+	true
+	return
+}
+
+is_21xx_enabled(){
+	if is_interface_uart; then
+		false
+		return
+	fi
+
+	check_gpio_status "sc"
+	if [ $? -eq 0 ]; then
+		false
+		return
+	fi
+
+	true
+	return
+}
+
+is_2010_enabled(){
+	if ! is_usb_connected; then
+		false
+		return
+	fi
+
+	check_gpio_status "usb"
+	if [ $? -ne 0 ]; then
+		false
+		return
+	fi
+
+	true
+	return
+}
+
+enable_devices(){
+
+	exit_if_not_root
+
+	usb=$1
+	uart=$2
+	sc=$3
+
+	if [ $usb = "off" ]; then
+		if is_usb_connected; then
+			switch_gpio_state "usb"  "off"
+		fi
+	else
+		switch_gpio_state "usb"  "on"
+		timeout 5 sh -c 'while true; do  if lsusb | grep -q "0a89:0030"; then exit 0; fi; done'
+		if [ $? -ne 0 ] ; then
+			print_error "unable to power on Rutoken 2010; Runtoken 2010 is not connected by usb"
+			exit 1
+		fi
+	fi
+
+	if [ $uart = "off" ]; then
+		hide_librtuart
+		set_interface_sc
+		switch_gpio_state "uart" "off"
+
+	else
+		reveal_librtuart
+		set_interface_uart
+		switch_gpio_state "uart" "on"
+	fi
+
+	if [ $sc = "off" ]; then
+		set_interface_uart
+		switch_gpio_state "sc" "off"
+	else
+		set_interface_sc
+		switch_gpio_state "sc" "on"
+	fi
 }
