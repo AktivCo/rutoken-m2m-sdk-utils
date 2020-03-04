@@ -1,38 +1,60 @@
 #!/bin/sh
 
-. /opt/Rutoken/scripts/include/rt-api
+
+include_rt_api(){
+
+	script_path=$(realpath $0)
+	script_dir="$(dirname $script_path)"
+	rtapi_path="$script_dir/include/rt-api"
+
+	source $rtapi_path
+}
 
 usage(){
-	echo "Usage: [sudo] rt-control <command> [command options]"
+	echo "Usage: rt-control <command> [command options]"
+	echo ""
 	echo "Commands:"
-	echo "          -s, --select_devices     [devices]      configure and select the device to be seen by PC/SC driver (implicitly starts pcscd)"
-	echo "          Devices:"
-	echo "                      2010             select Rutoken 2010 SoC to be seen by PC/SC driver"
-	echo "                      4010             select Rutoken 4010 SoM to be seen by PC/SC driver"
-	echo "                      21xx             select Rutoken 2100/2151 MicroSIM to be seen by PC/SC driver"
-	echo " "
-	echo " "
-	echo "          -d, --disable_log                     disable pcscd logging (implicitly disables CCID and Rutoken 4010 SOM uart drivers logs)"
-	echo "          -l, --log_level         [flags]       change logging settings (call without additional flags will set log level for both drivers to 3 - default)"
-	echo "          Flags:"
-	echo "                      -c  <level_ccid>    set log level for CCID driver"
-	echo "                      -u  <level_rtuart>    set log level for Rutoken 4010 SOM uart driver"
-	echo "                                     level_ccid is a binary OR combination of 4 different levels:"
-	echo "                                                1: critical: important error messages"
-	echo "                                                2: info:     informative messages like what reader was detected"
-	echo "                                                4: comm:     a dump of all the bytes exchanged between the host and the reader"
-	echo "                                                8: periodic: periodic info when pcscd test if a card is present (every 1/10 of a second)"
-	echo " "
-	echo "                                     level_rtuart is a binary OR combination of 4 different levels:"
-	echo "                                                1: critical: important error messages"
-	echo "                                                2: error:    all error messages"
-	echo "                                                4: info:     a dump of all the bytes exchanged between the host and the reader"
-	echo "                                                8: debug:    periodic info when pcscd test if a card is present (every 1/10 of a second)"
-	echo " "
-	echo " "
-	echo "          -p, --pcscd  <start|stop|restart>      start, stop or restart pcscd"
-	echo "          -i, --info                             see information about current working interfaces"
-	echo "          -h, --help                             see this message"
+	echo "  -s, --select_devices [<device>...]"
+	echo "    Configure and select the device to be accessible over PCSC (implicitly"
+	echo "    starts pcscd). Requires root privileges."
+	echo "    Values for <device>:"
+	echo "      2010 - Rutoken 2010 SoC"
+	echo "      4010 - Rutoken 4010 SoM"
+	echo "      21xx - MicroSIM reader for Rutoken 2100/2151"
+	echo -e "    ${Bold}All devices will be turned off if no device is specified${End}"
+	echo ""
+	echo "  -d, --disable_log"
+	echo "    Disable pcscd logging (implicitly disables CCID and RTUART drivers log)."
+	echo "    Requires root privileges."
+	echo ""
+	echo "  -l, --log_level [<driver_log_level>...]"
+	echo "    Enable logging of pcscd and smartcard drivers. Requires root privileges."
+	echo "    Log is written to /var/log/messages."
+	echo "    Values for <driver_log_level>:"
+	echo "      -c <level_ccid>"
+	echo "        Set log level for CCID driver (default value is 3)."
+	echo "        Value of <level_ccid> is a binary OR combination of the values:"
+	echo "          1 - critical: important error messages"
+	echo "          2 - info: informative messages"
+	echo "          4 - comm: dump of communication with smartcard/reader"
+	echo "          8 - periodic: periodic informative messages (every 0.1 sec)"
+	echo "      -u <level_rtuart>"
+	echo "        Set log level for RTUART driver (default value is 3)."
+	echo "        Value of <level_rtuart> is a binary OR combination of the values:"
+	echo "          1 - critical: important error messages"
+	echo "          2 - error: all other error messages"
+	echo "          4 - info: informative messages"
+	echo "          8 - debug: periodic informative messages (every 0.1 sec)"
+	echo ""
+	echo "  -p, --pcscd  <start|stop|restart>"
+	echo "    Start, stop or restart pcscd. Requires root privileges."
+	echo ""
+	echo "  -i, --info"
+	echo ""
+	echo "    Show the status of controlled entities."
+	echo ""
+	echo "  -h, --help"
+	echo "    Show this message."
 }
 
 check_arg(){
@@ -45,6 +67,8 @@ check_arg(){
 }
 
 start_stop_pcscd(){
+
+	exit_if_not_root
 
 	check_arg $1
 
@@ -76,6 +100,8 @@ start_stop_pcscd(){
 }
 
 set_device(){
+
+	exit_if_not_root
 
 	soc="off"
 	som="off"
@@ -114,25 +140,25 @@ set_device(){
 
 info(){
 
-	if is_2010_enabled; then
+	if soc_is_active; then
 		rutoken_soc="${Green} connected      ${End}"
 	else
 		rutoken_soc="${Red} not connected  ${End}"
 	fi
 
-	if is_4010_enabled; then
+	if som_is_active; then
 		rutoken_som="${Green} connected      ${End}"
 	else
 		rutoken_som="${Red} not connected  ${End}"
 	fi
 
-	if is_21xx_enabled; then
+	if sim_is_active; then
 		rutoken_microsim="${Green} connected      ${End}"
 	else
 		rutoken_microsim="${Red} not connected  ${End}"
 	fi
 
-	if is_pcscd_running; then
+	if pcscd_is_running; then
 		pcscd="${Green} running     ${End}"
 	else
 		pcscd="${Red} not running ${End}"
@@ -185,33 +211,33 @@ info(){
 		rtuart_log_level="$rtuart_log_level "
 	fi
 
-	echo " "
+	echo ""
 	echo -e "${Purple}Devices physical state information${End}■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo -e " Rutoken 2010      SoC      (usb)      $rutoken_soc to RPi2 ■"
 	echo -e " Rutoken 4010      SOM      (uart)     $rutoken_som to RPi2 ■"
 	echo -e " Rutoken 2151/2100 MicroSIM (sc)       $rutoken_microsim to RPi2 ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo " "
+	echo ""
 	echo -e "${Purple}PCSCD${End}■■■■■■■■■"
 	echo -e "$pcscd■"
 	echo "■■■■■■■■■■■■■■"
-	echo " "
+	echo ""
 	echo -e "${Purple}Devices availiability information${End}■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo -e " Rutoken 2010      SoC      (usb)   is $rutoken_soc_pcsc over PC/SC driver ■"
 	echo -e " Rutoken 4010      SOM      (uart)  is $rutoken_som_pcsc over PC/SC driver ■"
 	echo -e " Rutoken 2151/2100 MicroSIM (sc)    is $rutoken_microsim_pcsc over PC/SC driver ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo " "
+	echo ""
 	echo -e "${Purple}Logging information${End}■■■■■■■■■■■■■"
-	echo -e " pcscd   logging    $pcscd_logging ■"
+	echo -e " PCSCD   logging    $pcscd_logging ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo -e " ccid    logging    $ccid_logging ■"
+	echo -e " CCID    logging    $ccid_logging ■"
 	echo -e "         log level   $ccid_log_level        ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo -e " rtuart  logging    $rtuart_logging ■"
+	echo -e " RTUART  logging    $rtuart_logging ■"
 	echo -e "         log level   $rtuart_log_level        ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo " "
+	echo ""
 }
 
 check_numeric(){
@@ -273,7 +299,7 @@ set_log_levels(){
 	start_pcscd
 	ccid_lvl=$(echo $ccid_env | cut -d "=" -f2)
 	rtuart_lvl=$(echo $rtuart_env | cut -d "=" -f2)
-	print_succeed "ccid log level: $ccid_lvl; rtuart log level: $rtuart_lvl"
+	print_succeed "CCID log level: $ccid_lvl; RTUART log level: $rtuart_lvl"
 }
 
 disable_log(){
@@ -283,8 +309,9 @@ disable_log(){
 		print_succeed "the log hasn't been initialized before; nothing is done"
 		return
 	fi
-	echo " " > $log_config_path
+
 	stop_pcscd
+	echo " " > $log_config_path
 	start_pcscd
 	print_succeed "log disabled"
 }
@@ -330,4 +357,5 @@ main(){
 	esac
 }
 
+include_rt_api
 main $*

@@ -1,24 +1,37 @@
 #!/bin/sh
 
-. /opt/Rutoken/scripts/include/rt-api
+include_rt_api(){
+	
+	script_path=$(realpath $0)
+	script_dir="$(dirname $script_path)"
+	rtapi_path="$script_dir/include/rt-api"
+
+	source $rtapi_path
+}
 
 usage(){
-	echo "Usage: sudo rt-uart-test [option]"
+	echo "Usage: rt-uart-test [option]"
+	echo ""
+	echo "Runs rtuart_transport_test in preset environment."
+	echo "Requires root privileges."
+	echo ""
 	echo "Options:"
-	echo "        -f, --force   force run test; configurate system if needed"
-	echo "                      if -f option is not specified test won't start if system misconfigured"
-	echo "        -h, --help    see this message"
+	echo "  -f, --force"
+	echo "    Force run test; configure run environment if needed."
+	echo "    If -f is not specified test won't start in misconfigured environment."
+	echo "  -h, --help"
+	echo "    Show this message."
 }
 
 check_configuration(){
 
-	if is_pcscd_running; then
+	if pcscd_is_running; then
 		print_error "pcscd is running; kill pcscd or use -f option"
 		exit 1
 	fi
 
-	if ! is_4010_enabled; then
-		print_error "current selected interface is misconfigured; change interface via 'sudo rtm_control.sh -c uart' or use -f option"
+	if ! som_is_active; then
+		print_error "Rutoken 4010 is not available; change available interfaces manually or use -f option"
 		exit 1
 	fi
 
@@ -27,34 +40,43 @@ check_configuration(){
 }
 
 trasport_test(){
-
-	/opt/Rutoken/bin/rtuart_transport_test $1
+	echo ""
+	rtuart_transport_test $1
+	echo ""
 }
 
 run(){
 
 	exit_if_not_root
 
-	if check_configuration; then
-		trasport_test /dev/ttyAMA0
-	fi
-}
-
-force_run(){
-
 	pcscd_was_running=false
+	som_was_active=true
 
-	if is_pcscd_running; then
-		stop_pcscd
-		pcscd_was_running=true
+	if [ "$1" = "force" ]; then
+
+		if pcscd_is_running; then
+			stop_pcscd
+			pcscd_was_running=true
+		fi
+
+		if ! som_is_active; then
+			som_was_active=false
+		fi
+
+		enable_som
+
+	else
+		check_configuration
 	fi
 
-	set_interface_uart
-
-	trasport_test /dev/ttyAMA0
+	trasport_test "/dev/ttyAMA0"
 
 	if $pcscd_was_running; then
 		start_pcscd
+	fi
+
+	if ! $som_was_active; then
+		disable_som
 	fi
 }
 
@@ -68,7 +90,7 @@ main(){
 
 	case $1 in
 		-f | --force)
-			force_run
+			run "force"
 			exit 0
 		;;
 		-h | --help)
@@ -82,6 +104,5 @@ main(){
 	esac
 }
 
-
+include_rt_api
 main $1
-echo " "

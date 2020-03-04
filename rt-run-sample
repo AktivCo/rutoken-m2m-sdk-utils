@@ -1,27 +1,36 @@
 #!/bin/sh
 
-. /opt/Rutoken/scripts/include/rt-api
+include_rt_api(){
+	
+	script_path=$(realpath $0)
+	script_dir="$(dirname $script_path)"
+	rtapi_path="$script_dir/include/rt-api"
+
+	source $rtapi_path
+}
 
 usage(){
-	echo "Usage: sudo rt-run-sample [ options ] -p <path> "
+	echo "Usage: rt-run-sample [option...] -p <path>"
+	echo ""
+	echo "Run executable in preset environment. If logging is selected, logs are written" 
+	echo "to ~/log directory. Requires root privileges."
+	echo ""
 	echo "Options:"
-	echo "          -h                               see help message"
-	echo "          -s                               enable pcsc-spy logging of the sample"	
-	echo "          -l                               write sample output to log file"
-	echo -e "                                        \e[1mall logs are created in /home/user/log directory\e[0m"
-	echo "          -d  <device>                     select device to run sample on"
-	echo "          Devices:"
-	echo "                      2010                 run sample on Rutoken 2010 SoC only"
-	echo "                      4010                 run sample on Rutoken 4010 SoM only"
-	echo "                      all                  run sample on both devices; this is default settings if -d option not provided"
-	echo " "
-	echo "          -p  <path>                       path to sample to run"
+	echo "  -h - show this message"
+	echo "  -s - enable pcsc-spy logging for executable."
+	echo "  -l - write executable output to log file"
+	echo "  -d <device> - narrow reader list returned by PCSC."
+	echo "    Values for <device>:"
+	echo "      2010 - Rutoken 2010 SoC only"
+	echo "      4010 - Rutoken 4010 SoM only"
+	echo "      all - both Rutoken 2010 SoC and Rutoken 4010 SoM"
+	echo "  -p <path> - path to the executable to run"
 }
 
 check_sample(){
 
 	if [ ! -f $1 ]; then
-		print_error "no such sample: $1"
+		print_error "no such file: $1"
 		exit 1
 	fi
 }
@@ -34,14 +43,47 @@ check_device(){
 	fi
 }
 
+memorize_devices(){
+
+	soc_status="off"
+	som_status="off"
+	sim_status="off"
+	device_count=0
+
+	if soc_is_active; then
+		soc_status="on"
+		device_count=$((device_count+1))
+	fi
+
+	if som_is_active; then
+		som_status="on"
+		device_count=$((device_count+1))
+	fi
+
+	if sim_is_active; then
+		sim_status="on"
+		#device_count=$((device_count+1))
+	fi
+}
+
 select_device(){
 
 	stop_pcscd
 	case $1 in
 		2010) enable_devices "on"  "off" "off";;
-		4010) enable_devices "off" "on"  "off" ;;
-		all)  enable_devices "on"  "on"  "off";;
+		4010) enable_devices "off" "on"  "off";;
+		all)
+			print_info "Attention! Multiple devices are active; be sure executable to run supports multiple readers"
+			sleep 3 #give the user time to read
+			enable_devices "on"  "on"  "off";;
 	esac
+	start_pcscd
+}
+
+restore_devices(){
+
+	stop_pcscd
+	enable_devices $1 $2 $3
 	start_pcscd
 }
 
@@ -50,12 +92,12 @@ run_sample(){
 	spy=$1
 	log=$2
 	device=$3
-	sample=$(realpath $4 / | head -n 1)
-	sample_name=$( echo "$sample" | awk -F "/" '{print $NF}')
+	sample=$(realpath $4)
+	sample_name=$(basename $sample)
 
 	user=$(echo $SUDO_USER)
 	if [ -z $user ]; then
-		user=$(who am i | awk '{print $1}')
+		user=$(who am i | cut -d ' ' -f 1)
 	fi
 
 	home=$(sudo -u $user sh -c "cd ~$user && pwd")
@@ -65,6 +107,18 @@ run_sample(){
 
 	if [ -p $pcsc_spy_fifo ]; then
 		rm $pcsc_spy_fifo
+	fi
+
+	memorize_devices
+
+	if [ "$device" = "none" ] && [ $device_count -gt 1 ]; then
+		print_info "Attention! Multiple devices are active; be sure executable to run supports multiple readers"
+		sleep 3 #give the user time to read
+	fi
+
+	if [ "$device" = "none" ] && [ $device_count -eq 0 ]; then
+		print_error "none of the devices enabled; specify at least one device"
+		exit 1
 	fi
 
 	select_device $device
@@ -106,7 +160,7 @@ run_sample(){
 
 	fi
 
-	enable_devices "on"  "on"  "off"
+	restore_devices $soc_status $som_status $sim_status
 }
 
 main(){
@@ -118,7 +172,7 @@ main(){
 
 	spy_option=false
 	log_option=false
-	device='all'
+	device="none"
 	path=''
 
 	while getopts "hsld:p:" opt; do
@@ -144,11 +198,6 @@ main(){
 
 	exit_if_not_root
 
-	if ! is_pcscd_running; then
-		print_info "pcscd isn't running; starting pcscd"
-		start_pcscd
-	fi
-
 	if [ ! -z $path ]; then
 		run_sample $spy_option $log_option $device $path
 	else
@@ -158,4 +207,5 @@ main(){
 	fi
 }
 
+include_rt_api
 main $*
