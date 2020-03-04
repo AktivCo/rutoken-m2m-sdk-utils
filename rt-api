@@ -70,14 +70,22 @@ stop_pcscd(){
 	return
 }
 
-init_log(){
+log_exists(){
 
 	log_config_path="/tmp/rtm_log.config"
 
 	if [ ! -f $log_config_path ]; then
-		touch $log_config_path
+		false
+	else
+		true
 	fi
+	return
+}
 
+init_log(){	
+
+	touch $log_config_path
+	
 	pcscd_flags=''
 	ccid_env=''
 	rtuart_env=''
@@ -85,7 +93,9 @@ init_log(){
 
 read_log_config(){
 
-	init_log
+	if ! log_exists; then
+		init_log
+	fi
 
 	pcscd_flags=$(cat $log_config_path | grep pcscd_flags | cut -d '=' -f2)
 

@@ -45,14 +45,14 @@ start_stop_pcscd(){
 			if start_pcscd; then
 				print_succeed "pcscd started"
 			else
-				print_info "pcscd is already running; Nothing done"
+				print_info "pcscd is already running; nothing is done"
 			fi
 		;;
 		stop)
 			if stop_pcscd; then
 				print_succeed "pcscd stopped"
 			else
-				print_info "pcscd is not running; Nothing done"
+				print_info "pcscd is not running; nothing is done"
 			fi
 		;;
 		restart)
@@ -270,9 +270,14 @@ set_log_levels(){
 
 disable_log(){
 
-	exit_if_not_root
-	init_log
+	if ! log_exists; then
+		init_log
+		print_succeed "the log hasn't been initialized before; nothing is done"
+		return
+	fi
 	echo " " > $log_config_path
+	stop_pcscd
+	start_pcscd
 	print_succeed "log disabled"
 }
 

@@ -37,10 +37,9 @@ check_device(){
 select_device(){
 
 	stop_pcscd
-
 	case $1 in
 		2010) enable_devices "on"  "off" "off";;
-		4010) enable devices "off" "on"  "off" ;;
+		4010) enable_devices "off" "on"  "off" ;;
 		all)  enable_devices "on"  "on"  "off";;
 	esac
 	start_pcscd
