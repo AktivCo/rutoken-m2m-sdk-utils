@@ -1,4 +1,4 @@
-[Английский/English](README.md)
+[Английский/English](README_EN.md)
 
 # Rutoken M2M SDK Utils
 
@@ -95,7 +95,7 @@
 
 **rt-uart-test** - утилита, предназначенная для запуска приложения rtuart_transport_test в предустановленном окружении.
 
-### Synopsis
+### Синтаксис
 
 `rt-uart-test [option]`
 
