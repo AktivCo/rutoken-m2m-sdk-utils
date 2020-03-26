@@ -1,11 +1,11 @@
 [Russian/Русский](README_RUS.md)
 
-# General description
+# Rutoken M2M SDK Utils
 
 This project is a bunch of utilities to be used in [Rutoken M2M SDK](https://www.rutoken.ru/products/all/rutoken-m2m/)
 to provide a better user experience.
 
-# rt-control
+## rt-control
 
 **rt-control** -- control the state of the physical connection of smartcards hosted on
 [Rutoken M2M demo board](https://www.rutoken.ru/products/all/rutoken-m2m/)
@@ -54,7 +54,7 @@ Display information concerning smartcard power status, its availability over PC/
 
 Display help message.
 
-# rt-run-sample
+## rt-run-sample
 
 **rt-run-sample** - run executable in the preset environment with pcsc-spy enabled and/or some devices on Rutoken M2M demo board powered off.
 
@@ -98,7 +98,7 @@ Display help message.
 
 The major reason to use this utility in Rutoken M2M SDK is that Rutoken SDK samples distributed with the demo board use the first found PKCS#11 slot, so you can not be sure which smartcard is used in the sample.
 
-# rt-uart-test
+## rt-uart-test
 
 **rt-uart-test** - run rtuart_transport_test in preset environment.
 
