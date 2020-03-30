@@ -165,13 +165,13 @@ info(){
 	fi
 
 	timeout 1 pcsc_scan 1> /tmp/.pcsc_scan_info 2>/dev/null
-	if grep -q "Aktiv Rutoken ECP" /tmp/.pcsc_scan_info; then
+	if grep -q -i "Aktiv Rutoken ECP [0-9]" /tmp/.pcsc_scan_info; then
 		rutoken_soc_pcsc="${Green} available     ${End}"
 	else
 		rutoken_soc_pcsc="${Red} not available ${End}"
 	fi
 
-	if grep -q "Rutoken ECP B" /tmp/.pcsc_scan_info; then
+	if grep -q "Aktiv Rutoken ECP B" /tmp/.pcsc_scan_info; then
 		rutoken_som_pcsc="${Green} available     ${End}"
 	else
 		rutoken_som_pcsc="${Red} not available ${End}"
