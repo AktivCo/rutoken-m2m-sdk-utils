@@ -19,7 +19,7 @@ usage(){
 	echo "    starts pcscd). Requires root privileges."
 	echo "    Values for <device>:"
 	echo "      2010 - Rutoken 2010 SoC"
-	echo "      4010 - Rutoken 4010 SoM"
+	echo "      4010 - Rutoken 4010 SOM"
 	echo "      21xx - MicroSIM reader for Rutoken 2100/2151"
 	echo -e "    ${Bold}All devices will be turned off if no device is specified${End}"
 	echo ""
@@ -134,7 +134,7 @@ set_device(){
 	stop_pcscd
 	enable_devices $soc $som $sim
 	start_pcscd
-	print_succeed "Rutoken 4010 SoM is $som; Rutoken 2010 is $soc; Rutoken 2100/2151 is $sim"
+	print_succeed "Rutoken 4010 is $som; Rutoken 2010 is $soc; Rutoken 2100/2151 is $sim"
 
 }
 
@@ -213,9 +213,9 @@ info(){
 
 	echo ""
 	echo -e "${Purple}Devices physical state information${End}■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo -e " Rutoken 2010      SoC      (usb)      $rutoken_soc to RPi2 ■"
-	echo -e " Rutoken 4010      SOM      (uart)     $rutoken_som to RPi2 ■"
-	echo -e " Rutoken 2151/2100 MicroSIM (sc)       $rutoken_microsim to RPi2 ■"
+	echo -e " Rutoken 2010      SoC      (usb)      $rutoken_soc to RPi  ■"
+	echo -e " Rutoken 4010      SOM      (uart)     $rutoken_som to RPi  ■"
+	echo -e " Rutoken 2151/2100 MicroSIM (sc)       $rutoken_microsim to RPi  ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo ""
 	echo -e "${Purple}PCSCD${End}■■■■■■■■■"
