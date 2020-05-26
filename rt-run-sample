@@ -23,7 +23,9 @@ usage(){
 	echo "    Values for <device>:"
 	echo "      2010 - Rutoken 2010 SoC only"
 	echo "      4010 - Rutoken 4010 SoM only"
-	echo "      all - both Rutoken 2010 SoC and Rutoken 4010 SoM"
+	echo "      21xx - MicroSIM reader only"
+	echo "      2010+4010 - both Rutoken 2010 SoC and Rutoken 4010 SoM"
+	echo "      2010+21xx -  both Rutoken 2010 SoC and MicroSIM reader"
 	echo "  -p <path> - path to the executable to run"
 }
 
@@ -37,7 +39,7 @@ check_sample(){
 
 check_device(){
 
-	if ! echo $1| grep -Eq '^(4010|2010|all)'; then
+	if ! echo $1| grep -Eq '^(4010|2010|21xx|2010\+4010|2010\+21xx)$'; then
 		print_error "Device $1 doesn't exist"
 		exit 1
 	fi
@@ -62,7 +64,7 @@ memorize_devices(){
 
 	if sim_is_active; then
 		sim_status="on"
-		#device_count=$((device_count+1))
+		device_count=$((device_count+1))
 	fi
 }
 
@@ -72,10 +74,15 @@ select_device(){
 	case $1 in
 		2010) enable_devices "on"  "off" "off";;
 		4010) enable_devices "off" "on"  "off";;
-		all)
+		21xx) enable_devices "off" "off" "on";;
+		2010+4010)
 			print_info "Attention! Multiple devices are active; be sure executable to run supports multiple readers"
 			sleep 3 #give the user time to read
 			enable_devices "on"  "on"  "off";;
+		2010+21xx)
+			print_info "Attention! Multiple devices are active; be sure executable to run supports multiple readers"
+			sleep 3 #give the user time to read
+			enable_devices "on"  "off" "on";;
 	esac
 	start_pcscd
 }

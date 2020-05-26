@@ -102,6 +102,8 @@ read_log_config(){
 	ccid_env=$(cat $log_config_path | grep LIBCCID_ifdLogLevel)
 
 	rtuart_env=$(cat $log_config_path | grep LIBRTUART_ifdLogLevel)
+
+	rtuartscreader_env=$(cat $log_config_path | grep LIBRTUARTSCREADER_ifdLogLevel)
 }
 
 start_pcscd(){
@@ -114,7 +116,7 @@ start_pcscd(){
 	fi
 
 	read_log_config
-	env_variables="$ccid_env $rtuart_env"
+	env_variables="$ccid_env $rtuart_env $rtuartscreader_env"
 	sh -c "$env_variables start-stop-daemon -SbC -p /var/run/pcscd/pcscd.pid -x /usr/sbin/pcscd -- $pcscd_flags 1>/dev/null 2>/dev/null"
 	timeout 5 sh -c 'while true; do start-stop-daemon -T -p /var/run/pcscd/pcscd.pid; if [ $? -eq 0 ]; then exit 0; fi; done'
 	if [ $? -ne 0 ] ; then
@@ -273,6 +275,34 @@ librtuart_is_visible(){
 	return
 }
 
+hide_librtuartscreader(){
+
+	exit_if_not_root
+
+	if [ -f /etc/reader.conf.d/librtuartscreader ]; then
+		mv /etc/reader.conf.d/librtuartscreader /etc/reader.conf.d/.librtuartscreader
+	fi
+}
+
+make_librtuartscreader_visible(){
+
+	exit_if_not_root
+
+	if [ -f /etc/reader.conf.d/.librtuartscreader ]; then
+		mv /etc/reader.conf.d/.librtuartscreader /etc/reader.conf.d/librtuartscreader
+	fi
+}
+
+librtuartscreader_is_visible(){
+
+	if [ -f /etc/reader.conf.d/librtuartscreader ]; then
+		true
+	else
+		false
+	fi
+	return
+}
+
 som_is_active(){
 
 	if ! switch_is_on_som; then
@@ -302,6 +332,11 @@ sim_is_active(){
 	fi
 
 	if ! gpio_pin_is_low "sim"; then
+		false
+		return
+	fi
+
+	if ! librtuartscreader_is_visible; then
 		false
 		return
 	fi
@@ -358,11 +393,13 @@ disable_som(){
 }
 
 enable_sim(){
+	make_librtuartscreader_visible
 	set_switch_on_sim
 	set_gpio_state "sim" "low"
 }
 
 disable_sim(){
+	hide_librtuartscreader
 	set_switch_on_som
 	set_gpio_state "sim" "high"
 }

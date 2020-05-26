@@ -34,9 +34,9 @@ Devices not specified in command will be powered off. The following `device` val
 
 Note that enabling both Rutoken 4010 and MicroSIM reader simultaneously is not supported because of Rutoken M2M demo board schematics.
 
-##### `-l, --log_level [-c <ccid_log_level>] [-u <rtuart_log_level>]`
+##### `-l, --log_level [-c <ccid_log_level>] [-u <rtuart_log_level>] [-s <rtuartscreader_log_level>]`
 
-Enable pcscd logging. Pcscd gets restarted with `-a -d` options. Additionally with `-c <ccid_log_level>` and `-u <rtuart_log_level>` log level of [CCID](https://ccid.apdu.fr/) driver and [rtuart](https://github.com/AktivCo/rtuart) driver can be specified. Both drivers use numeric value in range from 0 to 15 to represent log level. See corresponding driver descriptions for more info.
+Enable pcscd logging. Pcscd gets restarted with `-a -d` options. Additionally with `-c <ccid_log_level>`, `-u <rtuart_log_level>` and `-s <rtuartscreader_log_level>` log level of [CCID](https://ccid.apdu.fr/), [rtuart](https://github.com/AktivCo/rtuart) and [rtuartscreader](https://github.com/AktivCo/rtuartscreader) drivers can be specified. Both drivers use numeric value in range from 0 to 15 to represent log level. See corresponding driver description for more info.
 
 ##### `-d, --disable_log`
 
@@ -84,7 +84,9 @@ Specify devices that will be powered on and thus accessible over PC/SC during ex
 Option values supported:
     * 2010 -- Rutoken 2010 SoC only is powered on.
     * 4010 -- Rutoken 4010 SoM only is powered on.
-    * all -- both Rutoken 2010 SoC and Rutoken 4010 SoM are powered on.
+    * 21xx -- MicroSIM reader only is powered on.
+    * 2010+4010 - both Rutoken 2010 SoC and Rutoken 4010 SoM are powered on.
+    * 2010+21xx - both Rutoken 2010 SoC and MicroSIM reader are powered on.
 
 ##### `-p <path>`
 

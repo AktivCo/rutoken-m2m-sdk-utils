@@ -37,14 +37,22 @@ usage(){
 	echo "          1 - critical: important error messages"
 	echo "          2 - info: informative messages"
 	echo "          4 - comm: dump of communication with smartcard/reader"
-	echo "          8 - periodic: periodic informative messages (every 0.1 sec)"
+	echo "          8 - periodic: periodic informative messages (every 0.4 sec)"
 	echo "      -u <level_rtuart>"
 	echo "        Set log level for RTUART driver (default value is 3)."
 	echo "        Value of <level_rtuart> is a binary OR combination of the values:"
 	echo "          1 - critical: important error messages"
 	echo "          2 - error: all other error messages"
 	echo "          4 - info: informative messages"
-	echo "          8 - debug: periodic informative messages (every 0.1 sec)"
+	echo "          8 - periodic: periodic informative messages (every 0.4 sec)"
+	echo "      -s <level_rtuartscreader>"
+	echo "        Set log level for RTUART SC READER driver (default value is 3)."
+	echo "        Value of <level_rtuartscreader> is a binary OR combination of the"
+	echo "        values:"
+	echo "          1 - critical: important error messages"
+	echo "          2 - error: all other error messages"
+	echo "          4 - info: informative messages"
+	echo "          8 - periodic: periodic informative messages (every 0.4 sec)"
 	echo ""
 	echo "  -p, --pcscd  <start|stop|restart>"
 	echo "    Start, stop or restart pcscd. Requires root privileges."
@@ -177,9 +185,13 @@ info(){
 		rutoken_som_pcsc="${Red} not available ${End}"
 	fi
 
-	rm /tmp/.pcsc_scan_info
+	if grep -q "Aktiv Rutoken UART SC Reader" /tmp/.pcsc_scan_info; then
+		rutoken_microsim_pcsc="${Green} available     ${End}"
+	else
+		rutoken_microsim_pcsc="${Red} not available ${End}"
+	fi
 
-	rutoken_microsim_pcsc="${Red} not available ${End}"
+	rm /tmp/.pcsc_scan_info
 
 	read_log_config
 
@@ -189,6 +201,8 @@ info(){
 		ccid_log_level=0
 		rtuart_logging="${Red} disabled ${End}"
 		rtuart_log_level=0
+		rtuartscreader_logging="${Red} disabled ${End}"
+		rtuartscreader_log_level=0
 	else
 		pcscd_logging="${Green} enabled  ${End}"
 		ccid_logging="${Green} enabled  ${End}"
@@ -201,6 +215,11 @@ info(){
 		if [ $rtuart_log_level -eq 0 ]; then
 			rtuart_logging="${Red} disabled ${End}"
 		fi
+		rtuartscreader_logging="${Green} enabled  ${End}"
+		rtuartscreader_log_level=$(echo $rtuartscreader_env | cut -d "=" -f2)
+		if [ $rtuartscreader_log_level -eq 0 ]; then
+			rtuartscreader_logging="${Red} disabled ${End}"
+		fi
 	fi
 
 	if [ "$ccid_log_level" -lt "10" ]; then
@@ -209,6 +228,10 @@ info(){
 
 	if [ "$rtuart_log_level" -lt "10" ]; then
 		rtuart_log_level="$rtuart_log_level "
+	fi
+
+	if [ "$rtuartscreader_log_level" -lt "10" ]; then
+		rtuartscreader_log_level="$rtuartscreader_log_level "
 	fi
 
 	echo ""
@@ -228,15 +251,18 @@ info(){
 	echo -e " Rutoken 2151/2100 MicroSIM (sc)    is $rutoken_microsim_pcsc over PC/SC driver ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo ""
-	echo -e "${Purple}Logging information${End}■■■■■■■■■■■■■"
-	echo -e " PCSCD   logging    $pcscd_logging ■"
-	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo -e " CCID    logging    $ccid_logging ■"
-	echo -e "         log level   $ccid_log_level        ■"
-	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	echo -e " RTUART  logging    $rtuart_logging ■"
-	echo -e "         log level   $rtuart_log_level        ■"
-	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e "${Purple}Logging information${End}■■■■■■■■■■■■■■■■■■■■"
+	echo -e " PCSCD          logging    $pcscd_logging ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e " CCID           logging    $ccid_logging ■"
+	echo -e "                log level   $ccid_log_level        ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e " RTUART         logging    $rtuart_logging ■"
+	echo -e "                log level   $rtuart_log_level        ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+	echo -e " RTUARTSCREADER logging    $rtuartscreader_logging ■"
+	echo -e "                log level   $rtuartscreader_log_level        ■"
+	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo ""
 }
 
@@ -252,7 +278,7 @@ set_log_levels(){
 
 	exit_if_not_root
 
-	while getopts ":c:u:" opt; do
+	while getopts ":c:u:s:" opt; do
 		case $opt in
 			c)
 				check_numeric
@@ -261,6 +287,10 @@ set_log_levels(){
 			u)
 				check_numeric
 				rtuart_lvl=$OPTARG
+			;;
+			s)
+				check_numeric
+				rtuartscreader_lvl=$OPTARG
 			;;
 			:)
 				print_error "Option -$OPTARG requires an argument!"
@@ -288,18 +318,25 @@ set_log_levels(){
 		rtuart_lvl=3
 	fi
 
+	if [ -z "$rtuartscreader_lvl" ]; then
+		rtuartscreader_lvl=3
+	fi
+
 	ccid_env="LIBCCID_ifdLogLevel=$ccid_lvl"
 	rtuart_env="LIBRTUART_ifdLogLevel=$rtuart_lvl"
+	rtuartscreader_env="LIBRTUARTSCREADER_ifdLogLevel=$rtuartscreader_lvl"
 
 	echo $pcscd_flags > $log_config_path
 	echo $ccid_env >> $log_config_path
 	echo $rtuart_env >> $log_config_path
+	echo $rtuartscreader_env >> $log_config_path
 
 	stop_pcscd
 	start_pcscd
 	ccid_lvl=$(echo $ccid_env | cut -d "=" -f2)
 	rtuart_lvl=$(echo $rtuart_env | cut -d "=" -f2)
-	print_succeed "CCID log level: $ccid_lvl; RTUART log level: $rtuart_lvl"
+	rtuartscreader_lvl=$(echo $rtuartscreader_env | cut -d "=" -f2)
+	print_succeed "CCID log level: $ccid_lvl; RTUART log level: $rtuart_lvl; RTUART SC Reader log level: $rtuartscreader_lvl"
 }
 
 disable_log(){
