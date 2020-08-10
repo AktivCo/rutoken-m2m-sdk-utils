@@ -430,3 +430,33 @@ enable_devices(){
 		enable_sim
 	fi
 }
+
+memorize_devices(){
+
+	soc_status="off"
+	som_status="off"
+	sim_status="off"
+	device_count=0
+
+	if soc_is_active; then
+		soc_status="on"
+		device_count=$((device_count+1))
+	fi
+
+	if som_is_active; then
+		som_status="on"
+		device_count=$((device_count+1))
+	fi
+
+	if sim_is_active; then
+		sim_status="on"
+		device_count=$((device_count+1))
+	fi
+}
+
+restore_devices(){
+
+	stop_pcscd
+	enable_devices $soc_status $som_status $sim_status
+	start_pcscd
+}

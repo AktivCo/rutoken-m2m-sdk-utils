@@ -50,7 +50,6 @@ run(){
 	exit_if_not_root
 
 	pcscd_was_running=false
-	som_was_active=true
 
 	if [ "$1" = "force" ]; then
 
@@ -59,9 +58,7 @@ run(){
 			pcscd_was_running=true
 		fi
 
-		if ! som_is_active; then
-			som_was_active=false
-		fi
+		memorize_devices
 
 		enable_som
 
@@ -71,12 +68,10 @@ run(){
 
 	trasport_test "/dev/ttyAMA0"
 
-	if $pcscd_was_running; then
-		start_pcscd
-	fi
+	restore_devices
 
-	if ! $som_was_active; then
-		disable_som
+	if ! $pcscd_was_running; then
+		stop_pcscd
 	fi
 }
 
