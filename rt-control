@@ -222,17 +222,9 @@ info(){
 		fi
 	fi
 
-	if [ "$ccid_log_level" -lt "10" ]; then
-		ccid_log_level="$ccid_log_level "
-	fi
-
-	if [ "$rtuart_log_level" -lt "10" ]; then
-		rtuart_log_level="$rtuart_log_level "
-	fi
-
-	if [ "$rtuartscreader_log_level" -lt "10" ]; then
-		rtuartscreader_log_level="$rtuartscreader_log_level "
-	fi
+	ccid_log_level=$(printf '%-9s' $ccid_log_level)
+	rtuart_log_level=$(printf '%-9s' $rtuart_log_level)
+	rtuartscreader_log_level=$(printf '%-9s' $rtuartscreader_log_level)
 
 	echo ""
 	echo -e "${Purple}Devices physical state information${End}■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
@@ -255,13 +247,13 @@ info(){
 	echo -e " PCSCD          logging    $pcscd_logging ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo -e " CCID           logging    $ccid_logging ■"
-	echo -e "                log level   $ccid_log_level        ■"
+	echo -e "                log level   $ccid_log_level ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo -e " RTUART         logging    $rtuart_logging ■"
-	echo -e "                log level   $rtuart_log_level        ■"
+	echo -e "                log level   $rtuart_log_level ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo -e " RTUARTSCREADER logging    $rtuartscreader_logging ■"
-	echo -e "                log level   $rtuartscreader_log_level        ■"
+	echo -e "                log level   $rtuartscreader_log_level ■"
 	echo "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
 	echo ""
 }
