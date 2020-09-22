@@ -352,7 +352,7 @@ soc_is_active(){
 		return
 	fi
 
-	if ! gpio_pin_is_low "soc"; then
+	if gpio_pin_is_low "soc"; then
 		false
 		return
 	fi
@@ -365,7 +365,7 @@ enable_soc(){
 
 	exit_if_not_root
 
-	set_gpio_state "soc"  "low"
+	set_gpio_state "soc"  "high"
 	timeout 5 sh -c 'while true; do  if lsusb | grep -q "0a89:0030"; then exit 0; fi; done'
 	if [ $? -ne 0 ] ; then
 		print_error "unable to power on Rutoken 2010; Rutoken 2010 is not connected by usb"
@@ -376,7 +376,7 @@ enable_soc(){
 
 disable_soc(){
 	if soc_connected; then
-		set_gpio_state "soc"  "high"
+		set_gpio_state "soc"  "low"
 	fi
 }
 
