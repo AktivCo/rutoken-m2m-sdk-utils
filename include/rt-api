@@ -178,27 +178,15 @@ gpio_pin_is_low(){
 	return
 }
 
-reset_gpio(){
+set_gpio_state_out (){
 
 	exit_if_not_root
 
-	if [ -d "/sys/class/gpio/gpio$1" ]; then
-		echo $1 > /sys/class/gpio/unexport
+	if [ ! -d "/sys/class/gpio/gpio$1" ]; then
+		echo $1 > /sys/class/gpio/export
 	fi
-
-	echo $1 > /sys/class/gpio/export
-}
-
-setup_gpio(){
-
-	exit_if_not_root
-
-	reset_gpio $1
 
 	echo $2 > "/sys/class/gpio/gpio$1/direction"
-	if [ ! -z $3 ]; then
-		echo $3 > "/sys/class/gpio/gpio$1/value"
-	fi
 }
 
 set_gpio_state(){
@@ -220,12 +208,9 @@ set_gpio_state(){
 		;;
 	esac
 
-	power=0
-	if [ $2 = "high" ]; then
-		power=1
-	fi
+	state=$2
 
-	setup_gpio $bcm 'out' $power
+	set_gpio_state_out $bcm $state
 }
 
 set_switch_on_sim(){
@@ -366,17 +351,26 @@ enable_soc(){
 	exit_if_not_root
 
 	set_gpio_state "soc"  "high"
-	timeout 5 sh -c 'while true; do  if lsusb | grep -q "0a89:0030"; then exit 0; fi; done'
+	timeout 5 sh -c 'while true; do  if lsusb 2>/dev/null | grep -q "0a89:0030"; then exit 0; fi; done'
+
 	if [ $? -ne 0 ] ; then
-		print_error "unable to power on Rutoken 2010; Rutoken 2010 is not connected by usb"
-		print_info "If you insist Rutoken 2010 is connected with USB cable, please perform hardware reset (including physical power off) of the demoboard"
-		exit 1
+	        print_error "unable to power on Rutoken 2010; Rutoken 2010 is not connected by usb"
+	        print_info "If you insist Rutoken 2010 is connected with USB cable, please perform hardware reset (including physical power off) of the demoboard"
+	        exit 1
 	fi
 }
 
 disable_soc(){
-	if soc_connected; then
-		set_gpio_state "soc"  "low"
+
+	exit_if_not_root
+
+	set_gpio_state "soc"  "low"
+
+	timeout 5 sh -c 'while true; do  if ! lsusb 2>/dev/null | grep -q "0a89:0030"; then exit 0; fi; done'
+
+	if [ $? -ne 0 ] ; then
+	        print_error "unable to power off Rutoken 2010"
+	        exit 1
 	fi
 }
 
